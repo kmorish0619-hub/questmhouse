@@ -293,11 +293,24 @@
         <span class="srow-text">名前: <span id="name-current">-</span></span>
         <span class="arrow">›</span>
       </div>
-      <div class="setting-row" id="leave-btn">
-        <span class="srow-text">このアプリから脱退する</span>
+      <div class="setting-row" id="logout-btn">
+        <span class="srow-text">ログアウト</span>
         <span class="arrow">›</span>
       </div>
-      <div class="setting-note">脱退しても、あなたのこれまでの記録は消えません。この端末に保存された名前だけを忘れます。もう一度同じ名前を入力すれば、そこから再開できます。</div>
+      <div class="setting-note">この端末に保存された名前だけを忘れます。あなたのこれまでの記録は消えません。もう一度同じ名前を入力すれば、そこから再開できます。</div>
+    </div>
+
+    <div class="card">
+      <h3>登録家族一覧</h3>
+      <div id="family-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="setting-row danger" id="withdraw-btn">
+        <span class="srow-text">家族から脱退する</span>
+        <span class="arrow">›</span>
+      </div>
+      <div class="setting-note">あなたの名前に紐づく達成・交換の記録を、家族の共有データから<b>完全に削除</b>します。この操作は取り消せません。ログアウトとは異なり、データ自体が消える点にご注意ください。</div>
     </div>
 
     <div class="card">
@@ -314,6 +327,20 @@
         ・一人だけがほぼ毎日実施している → 値上がりします(負担が偏っているサイン)<br>
         ・二人以上でほぼ毎日分担できている → 値下がりします<br>
         ・登録した金額は「基本金額」で、実際の表示額はここから変動します
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>共通ルール</h3>
+      <div class="setting-note">
+        ・習慣・ごほうびの追加/編集/削除は<b>家族共通</b>です。誰か一人が変更すると全員に反映されます<br><br>
+        ・並び替え(▲▼)も<b>家族共通</b>です<br><br>
+        ・お気に入り(★)は<b>個人ごと</b>です。あなたが★をつけても、他の家族の画面には影響しません。お気に入りにした項目は専用セクションに表示されつつ、元のカテゴリからも消えません<br><br>
+        ・習慣やごほうびを削除しても、<b>すでに達成/交換した記録や残高は消えません</b>(記録は削除時点の金額をそのまま保持します)<br><br>
+        ・達成のチェックは<b>個人ごと</b>です。自分がチェックしたものだけが自分の残高に反映されます<br><br>
+        ・名前を変更すると、過去の記録もすべて新しい名前に引き継がれます<br><br>
+        ・家族の共有データのリセットには、家族全員の承認が必要です<br><br>
+        ・名前(ログイン状態)は、この端末のブラウザだけに保存されます
       </div>
     </div>
   </div>
@@ -377,6 +404,8 @@
   }
 
   const PERSONAL_NAME_KEY = 'koki-quest-myname';
+  const FAV_HABITS_KEY = 'koki-quest-fav-habits';
+  const FAV_REWARDS_KEY = 'koki-quest-fav-rewards';
   const WINDOW_DAYS = 7;
   const CATEGORIES = [
     { key:'diet', label:'ダイエット' },
@@ -464,12 +493,21 @@
   }
 
   // ---------- Personal (this device only): stays in the browser, survives HTML updates ----------
+  let favHabitIds = new Set();
+  let favRewardIds = new Set();
+
   function loadPersonalName(){
     try{ myName = localStorage.getItem(PERSONAL_NAME_KEY) || ''; }catch(e){ myName = ''; }
   }
   function savePersonalName(){
     try{ localStorage.setItem(PERSONAL_NAME_KEY, myName); }catch(e){}
   }
+  function loadFavorites(){
+    try{ favHabitIds = new Set(JSON.parse(localStorage.getItem(FAV_HABITS_KEY) || '[]')); }catch(e){ favHabitIds = new Set(); }
+    try{ favRewardIds = new Set(JSON.parse(localStorage.getItem(FAV_REWARDS_KEY) || '[]')); }catch(e){ favRewardIds = new Set(); }
+  }
+  function saveFavHabits(){ try{ localStorage.setItem(FAV_HABITS_KEY, JSON.stringify([...favHabitIds])); }catch(e){} }
+  function saveFavRewards(){ try{ localStorage.setItem(FAV_REWARDS_KEY, JSON.stringify([...favRewardIds])); }catch(e){} }
 
   // ---------- Shared family data: lives in Firebase, independent of this HTML file ----------
   function saveCatalog(){
@@ -492,7 +530,7 @@
     renderHabits();
     renderRewards();
     if(activeTab === 'stats') renderStats();
-    if(activeTab === 'settings') renderResetStatus();
+    if(activeTab === 'settings') { renderResetStatus(); renderFamilyList(); }
   }
 
   if(catalogRef){
@@ -527,10 +565,10 @@
     const now = Date.now();
     const newHabits = DEFAULT_HABITS
       .filter(d => !existingHabitNames.has(d.name))
-      .map((d,i) => ({ id: uid(), name:d.name, category:d.category, minutes:d.minutes, basePrice:d.basePrice, createdAt: now, order: now+i, favorite:false }));
+      .map((d,i) => ({ id: uid(), name:d.name, category:d.category, minutes:d.minutes, basePrice:d.basePrice, createdAt: now, order: now+i }));
     const newRewards = DEFAULT_REWARDS
       .filter(d => !existingRewardNames.has(d.name))
-      .map((d,i) => ({ id: uid(), name:d.name, cost:d.cost, createdAt: now, order: now+i, favorite:false }));
+      .map((d,i) => ({ id: uid(), name:d.name, cost:d.cost, createdAt: now, order: now+i }));
     catalog.habits = [...catalog.habits, ...newHabits];
     catalog.rewards = [...catalog.rewards, ...newRewards];
     catalog.seeded = true;
@@ -593,7 +631,7 @@
     if(tab==='home') renderHome();
     if(tab==='habits') renderHabits(), renderRewards();
     if(tab==='stats') renderStats();
-    if(tab==='settings') renderResetStatus();
+    if(tab==='settings') { renderResetStatus(); renderFamilyList(); }
   }
   document.querySelectorAll('.tabbtn').forEach(btn=>{
     btn.addEventListener('click', ()=> showTab(btn.dataset.tab));
@@ -684,7 +722,7 @@
         existing.minutes = minRaw===''?null:parseFloat(minRaw);
         existing.basePrice = basePrice;
       } else {
-        catalog.habits.push({ id: uid(), name, category, minutes: minRaw===''?null:parseFloat(minRaw), basePrice, createdAt: Date.now(), order: Date.now(), favorite:false });
+        catalog.habits.push({ id: uid(), name, category, minutes: minRaw===''?null:parseFloat(minRaw), basePrice, createdAt: Date.now(), order: Date.now() });
       }
       await saveCatalog(); renderHabits(); closeModal();
     });
@@ -712,7 +750,7 @@
       const cost = parseInt(document.getElementById('m-cost').value) || 0;
       if(!name || cost<=0) return;
       if(isEdit){ existing.name = name; existing.cost = cost; }
-      else { catalog.rewards.push({ id: uid(), name, cost, createdAt: Date.now(), order: Date.now(), favorite:false }); }
+      else { catalog.rewards.push({ id: uid(), name, cost, createdAt: Date.now(), order: Date.now() }); }
       await saveCatalog(); renderRewards(); closeModal();
     });
     if(isEdit){
@@ -750,10 +788,10 @@
     renderRewards(); renderHome();
   }
 
-  async function toggleFavorite(list, item){
-    item.favorite = !item.favorite;
-    await saveCatalog();
-    if(list === 'habit') renderHabits(); else renderRewards();
+  function toggleFavorite(list, item){
+    const set = list === 'habit' ? favHabitIds : favRewardIds;
+    if(set.has(item.id)) set.delete(item.id); else set.add(item.id);
+    if(list === 'habit'){ saveFavHabits(); renderHabits(); } else { saveFavRewards(); renderRewards(); }
   }
 
   // Swaps this item's order with its visible neighbor (within the same category
@@ -769,11 +807,8 @@
     if(list === 'habit') renderHabits(); else renderRewards();
   }
 
-  function sortByFavoriteThenOrder(list){
-    return list.slice().sort((a,b)=>{
-      if(!!b.favorite !== !!a.favorite) return (b.favorite?1:0) - (a.favorite?1:0);
-      return (a.order||0) - (b.order||0);
-    });
+  function sortByOrder(list){
+    return list.slice().sort((a,b) => (a.order||0) - (b.order||0));
   }
 
   // ---------- Renderers: habits / rewards ----------
@@ -785,31 +820,44 @@
       return;
     }
     const name = myName || '(名無し)';
+
+    const habitRow = (h, i, group, compact) => {
+      const done = events.some(e=>e.type==='habit' && e.itemId===h.id && e.name===name && e.date===today);
+      const { price, mult } = computeHabitPrice(h);
+      const trend = mult >= 1.2 ? '<span class="trend-tag up">品薄</span>' : (mult <= 0.85 ? '<span class="trend-tag down">定番</span>' : '');
+      const meta = [h.minutes!=null?`${h.minutes}分`:null].filter(Boolean).join(' ・ ');
+      const isFav = favHabitIds.has(h.id);
+      const controls = compact
+        ? `<button class="fav-btn ${isFav?'on':''}" data-fav="${h.id}" data-scope="${compact}">★</button>`
+        : `<div class="item-controls">
+             <button class="fav-btn ${isFav?'on':''}" data-fav="${h.id}" data-scope="${compact}">★</button>
+             <button class="order-btn" data-up="${h.id}" ${i===0?'disabled':''}>▲</button>
+             <button class="order-btn" data-down="${h.id}" ${i===group.length-1?'disabled':''}>▼</button>
+           </div>`;
+      return `<div class="habit-card">
+        ${controls}
+        <div class="habit-info" data-edit="${h.id}">
+          <div class="hname">${escapeHtml(h.name)}</div>
+          <div class="hmeta">${meta?meta+' ・ ':''}<span class="price-tag">¥${yen(price)}</span>${trend}</div>
+        </div>
+        <button class="check-btn ${done?'done':''}" data-check="${h.id}">${done?'✓':''}</button>
+      </div>`;
+    };
+
     let html = '';
+    const favItems = sortByOrder(catalog.habits.filter(h => favHabitIds.has(h.id)));
+    if(favItems.length > 0){
+      html += `<div class="cat-label">お気に入り</div>`;
+      html += favItems.map((h,i)=> habitRow(h, i, favItems, 'fav')).join('');
+    }
     CATEGORIES.forEach(cat=>{
-      const items = sortByFavoriteThenOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
+      const items = sortByOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
       if(items.length === 0) return;
       html += `<div class="cat-label">${cat.label}</div>`;
-      html += items.map((h,i)=>{
-        const done = events.some(e=>e.type==='habit' && e.itemId===h.id && e.name===name && e.date===today);
-        const { price, mult } = computeHabitPrice(h);
-        const trend = mult >= 1.2 ? '<span class="trend-tag up">品薄</span>' : (mult <= 0.85 ? '<span class="trend-tag down">定番</span>' : '');
-        const meta = [h.minutes!=null?`${h.minutes}分`:null].filter(Boolean).join(' ・ ');
-        return `<div class="habit-card">
-          <div class="item-controls">
-            <button class="fav-btn ${h.favorite?'on':''}" data-fav="${h.id}">★</button>
-            <button class="order-btn" data-up="${h.id}" ${i===0?'disabled':''}>▲</button>
-            <button class="order-btn" data-down="${h.id}" ${i===items.length-1?'disabled':''}>▼</button>
-          </div>
-          <div class="habit-info" data-edit="${h.id}">
-            <div class="hname">${escapeHtml(h.name)}</div>
-            <div class="hmeta">${meta?meta+' ・ ':''}<span class="price-tag">¥${yen(price)}</span>${trend}</div>
-          </div>
-          <button class="check-btn ${done?'done':''}" data-check="${h.id}">${done?'✓':''}</button>
-        </div>`;
-      }).join('');
+      html += items.map((h,i)=> habitRow(h, i, items, false)).join('');
     });
     el.innerHTML = html;
+
     el.querySelectorAll('[data-check]').forEach(btn=>{
       btn.addEventListener('click', ()=> toggleHabit(catalog.habits.find(h=>h.id===btn.dataset.check)));
     });
@@ -819,13 +867,12 @@
     el.querySelectorAll('[data-fav]').forEach(btn=>{
       btn.addEventListener('click', ()=> toggleFavorite('habit', catalog.habits.find(h=>h.id===btn.dataset.fav)));
     });
+    // Up/down only exists on the full (non-compact) rows, one set per category.
     CATEGORIES.forEach(cat=>{
-      const group = sortByFavoriteThenOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
+      const group = sortByOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
       group.forEach(h=>{
-        const upBtn = el.querySelector(`[data-up="${h.id}"]`);
-        const downBtn = el.querySelector(`[data-down="${h.id}"]`);
-        if(upBtn) upBtn.addEventListener('click', ()=> moveItem('habit', group, h, -1));
-        if(downBtn) downBtn.addEventListener('click', ()=> moveItem('habit', group, h, 1));
+        el.querySelectorAll(`[data-up="${h.id}"]`).forEach(btn=> btn.addEventListener('click', ()=> moveItem('habit', group, h, -1)));
+        el.querySelectorAll(`[data-down="${h.id}"]`).forEach(btn=> btn.addEventListener('click', ()=> moveItem('habit', group, h, 1)));
       });
     });
   }
@@ -838,19 +885,35 @@
     }
     const name = myName || '(名無し)';
     const { balance } = balanceFor(name);
-    const items = sortByFavoriteThenOrder(catalog.rewards);
-    el.innerHTML = items.map((r,i)=>{
+
+    const rewardRow = (r, i, group, compact) => {
       const can = balance >= r.cost;
+      const isFav = favRewardIds.has(r.id);
+      const controls = compact
+        ? `<button class="fav-btn ${isFav?'on':''}" data-fav="${r.id}">★</button>`
+        : `<div class="item-controls">
+             <button class="fav-btn ${isFav?'on':''}" data-fav="${r.id}">★</button>
+             <button class="order-btn" data-up="${r.id}" ${i===0?'disabled':''}>▲</button>
+             <button class="order-btn" data-down="${r.id}" ${i===group.length-1?'disabled':''}>▼</button>
+           </div>`;
       return `<div class="reward-card">
-        <div class="item-controls">
-          <button class="fav-btn ${r.favorite?'on':''}" data-fav="${r.id}">★</button>
-          <button class="order-btn" data-up="${r.id}" ${i===0?'disabled':''}>▲</button>
-          <button class="order-btn" data-down="${r.id}" ${i===items.length-1?'disabled':''}>▼</button>
-        </div>
+        ${controls}
         <div class="reward-info" data-edit="${r.id}"><div class="rname">${escapeHtml(r.name)}</div><div class="rmeta">¥${yen(r.cost)}</div></div>
         <button class="redeem-btn" data-redeem="${r.id}" ${can?'':'disabled'}>交換する</button>
       </div>`;
-    }).join('');
+    };
+
+    let html = '';
+    const favItems = sortByOrder(catalog.rewards.filter(r => favRewardIds.has(r.id)));
+    if(favItems.length > 0){
+      html += `<div class="cat-label">お気に入り</div>`;
+      html += favItems.map((r,i)=> rewardRow(r, i, favItems, true)).join('');
+      html += `<div class="cat-label">すべて</div>`;
+    }
+    const allItems = sortByOrder(catalog.rewards);
+    html += allItems.map((r,i)=> rewardRow(r, i, allItems, false)).join('');
+    el.innerHTML = html;
+
     el.querySelectorAll('[data-redeem]').forEach(btn=>{
       btn.addEventListener('click', ()=> redeemReward(catalog.rewards.find(r=>r.id===btn.dataset.redeem)));
     });
@@ -860,11 +923,9 @@
     el.querySelectorAll('[data-fav]').forEach(btn=>{
       btn.addEventListener('click', ()=> toggleFavorite('reward', catalog.rewards.find(r=>r.id===btn.dataset.fav)));
     });
-    items.forEach((r,i)=>{
-      const upBtn = el.querySelector(`[data-up="${r.id}"]`);
-      const downBtn = el.querySelector(`[data-down="${r.id}"]`);
-      if(upBtn) upBtn.addEventListener('click', ()=> moveItem('reward', items, r, -1));
-      if(downBtn) downBtn.addEventListener('click', ()=> moveItem('reward', items, r, 1));
+    allItems.forEach(r=>{
+      el.querySelectorAll(`[data-up="${r.id}"]`).forEach(btn=> btn.addEventListener('click', ()=> moveItem('reward', allItems, r, -1)));
+      el.querySelectorAll(`[data-down="${r.id}"]`).forEach(btn=> btn.addEventListener('click', ()=> moveItem('reward', allItems, r, 1)));
     });
   }
 
@@ -1005,13 +1066,13 @@
   // ---------- Settings ----------
   document.getElementById('name-btn').addEventListener('click', ()=> openNameModal(false));
 
-  document.getElementById('leave-btn').addEventListener('click', ()=>{
+  document.getElementById('logout-btn').addEventListener('click', ()=>{
     openModal(`
-      <h3>このアプリから脱退しますか?</h3>
+      <h3>ログアウトしますか?</h3>
       <p style="font-size:13px; color:var(--muted); margin:0 0 16px;">この端末に保存されている名前(「${escapeHtml(myName||'未設定')}」)だけを忘れます。あなたのこれまでの記録や残高は家族の共有データに残ったままです。もう一度同じ名前で登録すれば、続きから使えます。</p>
       <div class="modal-actions">
         <button class="btn ghost" id="cancel-leave">キャンセル</button>
-        <button class="btn danger" id="confirm-leave">脱退する</button>
+        <button class="btn danger" id="confirm-leave">ログアウトする</button>
       </div>
     `);
     document.getElementById('cancel-leave').addEventListener('click', closeModal);
@@ -1023,6 +1084,51 @@
       openNameModal(true);
     });
   });
+
+  document.getElementById('withdraw-btn').addEventListener('click', ()=>{
+    const name = myName || '(名無し)';
+    openModal(`
+      <h3>家族から脱退しますか?</h3>
+      <p style="font-size:13px; color:var(--muted); margin:0 0 14px;">「${escapeHtml(name)}」としてのこれまでの達成・交換の記録が、家族の共有データから<b>完全に削除</b>されます。残高もゼロになり、この操作は<b>取り消せません</b>。</p>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">よろしければ、下に自分の名前(「${escapeHtml(name)}」)を入力してください。</p>
+      <div class="field"><input type="text" id="m-withdraw-confirm" placeholder="ここに名前を入力"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cancel-withdraw">キャンセル</button>
+        <button class="btn danger" id="confirm-withdraw" disabled style="opacity:.4;">脱退する</button>
+      </div>
+    `);
+    const input = document.getElementById('m-withdraw-confirm');
+    const confirmBtn = document.getElementById('confirm-withdraw');
+    input.addEventListener('input', ()=>{
+      const ok = input.value.trim() === name;
+      confirmBtn.disabled = !ok;
+      confirmBtn.style.opacity = ok ? '1' : '.4';
+    });
+    document.getElementById('cancel-withdraw').addEventListener('click', closeModal);
+    confirmBtn.addEventListener('click', async ()=>{
+      if(input.value.trim() !== name) return;
+      const mine = events.filter(e => e.name === name);
+      await Promise.all(mine.map(e => removeEvent(e.id)));
+      myName = '';
+      try{ localStorage.removeItem(PERSONAL_NAME_KEY); }catch(e){}
+      closeModal();
+      renderHome(); renderHabits(); renderRewards();
+      showToast('家族から脱退しました');
+      openNameModal(true);
+    });
+  });
+
+  function renderFamilyList(){
+    const el = document.getElementById('family-list');
+    if(!el) return;
+    const names = allFamilyNames();
+    if(names.length === 0){
+      el.innerHTML = '<div class="empty">まだ誰も記録がありません</div>';
+      return;
+    }
+    const rows = names.map(n => ({ n, b: balanceFor(n).balance })).sort((a,b)=>b.b-a.b);
+    el.innerHTML = rows.map(r=>`<div class="list-row"><div class="name">${escapeHtml(r.n)}${r.n===myName?' (あなた)':''}</div><div class="amt">¥${yen(r.b)}</div></div>`).join('');
+  }
 
   function renderResetStatus(){
     const el = document.getElementById('reset-status');
@@ -1107,6 +1213,7 @@
   // ---------- Init ----------
   function init(){
     loadPersonalName();
+    loadFavorites();
     renderHome();
     renderHabits();
     renderRewards();
