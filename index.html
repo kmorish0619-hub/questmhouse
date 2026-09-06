@@ -2,7 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#201A14">
 <title>森下家の習慣帳</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;500;600;700&display=swap');
@@ -146,13 +150,14 @@
   .setting-row .arrow{ color: var(--ink-soft); }
   .setting-note{ font-size:12px; color: var(--ink-soft); line-height:1.6; margin-top:8px; }
 
-  .tabbar{ position: static; flex-shrink:0; background: var(--bg-alt);
+  .tabbar{ position: static; flex-shrink:0; min-height: 58px; background: var(--bg-alt);
     border-top:1px solid var(--line-dark); display:flex; z-index:10;
-    padding-bottom: env(safe-area-inset-bottom); }
+    padding-bottom: env(safe-area-inset-bottom); box-sizing: content-box; }
   .tabbtn{ flex:1; background:none; border:none; color: var(--cream); opacity:.5; padding:10px 0 11px;
-    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; cursor:pointer;
-    font-family:'Archivo',sans-serif; }
-  .tabbtn .ico{ font-size:19px; }
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    font-size:11px; cursor:pointer; font-family:'Archivo',sans-serif; min-height:58px; }
+  .tabbtn .ico{ font-size:19px; line-height:1; }
+  .tabbtn .ico svg{ width:19px; height:19px; display:block; }
   .tabbtn.sel{ opacity:1; color: var(--mustard); }
 
   .modal-overlay{ position: fixed; inset:0; background: rgba(20,15,10,.7); z-index:30;
@@ -202,6 +207,10 @@
   .group-pick .gp-cur{ font-size:11px; color: var(--sage); font-weight:600; }
   .group-pick .gp-edit{ font-size:11px; color: var(--ink-soft); border:1px solid var(--line);
     border-radius:2px; padding:4px 9px; background:none; cursor:pointer; font-family:'Archivo',sans-serif; }
+
+  .join-pill{ font-size:11px; padding:5px 10px; border-radius:12px; flex-shrink:0; font-family:'Archivo',sans-serif; }
+  .join-pill.joined{ color: var(--sage); border:1px solid var(--sage); background: rgba(75,99,85,.12); }
+  .join-pill.unjoined{ color: #201A14; background: var(--mustard); cursor:pointer; font-weight:600; border:none; }
 </style>
 </head>
 <body>
@@ -217,6 +226,7 @@
         <div class="glabel">グループ</div>
         <div class="gname" id="group-name-home">—</div>
       </div>
+      <span class="join-pill" id="join-pill-home"></span>
       <button id="group-switch-home">切替</button>
     </div>
 
@@ -276,6 +286,7 @@
         <div class="glabel">グループ</div>
         <div class="gname" id="group-name-habits">—</div>
       </div>
+      <span class="join-pill" id="join-pill-habits"></span>
       <button id="group-switch-habits">切替</button>
     </div>
     <div class="subtabs">
@@ -625,8 +636,45 @@
     saveGid();
     seedGuard = {};
     attachGroupListeners(gid);
+    renderAll();
+  }
+
+  // A group is only "joined" once the member explicitly registers, or has a
+  // footprint already (completed something before this distinction existed).
+  function isJoinedToCurrentGroup(){
+    if(!myName || !currentGid) return false;
+    if(members[encodeKey(myName)]) return true;
+    return events.some(e => e.name === myName);
+  }
+
+  async function joinCurrentGroup(){
+    if(!myName){ openNameModal(true); return; }
     await registerMember();
     renderAll();
+    showToast(`「${groupsMeta[currentGid] ? groupsMeta[currentGid].name : ''}」に参加しました`);
+  }
+
+  // Gate for anything that would attribute an action to this person in the
+  // group (checking a habit, redeeming a reward) — asks first instead of
+  // silently enrolling them just because they looked at the group.
+  function requireJoin(action){
+    if(!myName){ openNameModal(true); return; }
+    if(isJoinedToCurrentGroup()){ action(); return; }
+    const gname = groupsMeta[currentGid] ? groupsMeta[currentGid].name : 'このグループ';
+    openModal(`
+      <h3>「${escapeHtml(gname)}」に参加しますか?</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">参加すると、あなたの名前がメンバーとしてこのグループに登録され、達成・交換の記録が残るようになります。</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="rj-cancel">キャンセル</button>
+        <button class="btn" id="rj-ok">参加する</button>
+      </div>
+    `);
+    document.getElementById('rj-cancel').addEventListener('click', closeModal);
+    document.getElementById('rj-ok').addEventListener('click', async ()=>{
+      await joinCurrentGroup();
+      closeModal();
+      action();
+    });
   }
 
   // ---------- Default content ----------
@@ -789,7 +837,6 @@
         await renameEverywhere(oldName, newName);
         showToast(`「${oldName}」から「${newName}」に変更しました`);
       }
-      await registerMember();
       renderAll();
     });
   }
@@ -808,8 +855,13 @@
         const updates = {};
         Object.keys(val).forEach(k => { if(val[k] && val[k].name === oldName) updates[k+'/name'] = newName; });
         if(Object.keys(updates).length) await gRef(gid).child('events').update(updates);
-        await gRef(gid).child('members/'+encodeKey(oldName)).remove();
-        await gRef(gid).child('members/'+encodeKey(newName)).set({ name:newName, joinedAt: Date.now() });
+        // Only carry membership over for groups the person had actually joined —
+        // renaming must not enroll them anywhere new.
+        const memberSnap = await gRef(gid).child('members/'+encodeKey(oldName)).once('value');
+        if(memberSnap.exists()){
+          await gRef(gid).child('members/'+encodeKey(oldName)).remove();
+          await gRef(gid).child('members/'+encodeKey(newName)).set({ name:newName, joinedAt: Date.now() });
+        }
       }catch(e){ console.error('rename in group failed', gid, e); }
     }
   }
@@ -958,11 +1010,14 @@
         await metaRef().child(gid+'/name').set(name).catch(e=>console.error(e));
         closeModal();
       } else {
+        if(!myName){ closeModal(); openNameModal(true); return; }
         const newGid = uid();
         await metaRef().child(newGid).set({ name, createdAt: Date.now() }).catch(e=>console.error(e));
         closeModal();
         await switchGroup(newGid);
-        showToast(`グループ「${name}」を作りました`);
+        await registerMember();
+        renderAll();
+        showToast(`グループ「${name}」を作って参加しました`);
       }
       renderAll();
     });
@@ -1012,24 +1067,28 @@
   async function toggleHabit(habit){
     if(!habit) return;
     if(!myName){ openNameModal(true); return; }
-    const today = todayStr();
-    const existing = events.find(e => e.type==='habit' && e.itemId===habit.id && e.name===myName && e.date===today);
-    if(existing){
-      await removeEvent(existing.id);
-    } else {
-      const { price } = computeHabitPrice(habit);
-      await addEvent({ id: uid(), type:'habit', name: myName, itemId: habit.id, itemName: habit.name, amount: price, date: today, ts: Date.now() });
-    }
-    renderHabits(); renderHome();
+    requireJoin(async ()=>{
+      const today = todayStr();
+      const existing = events.find(e => e.type==='habit' && e.itemId===habit.id && e.name===myName && e.date===today);
+      if(existing){
+        await removeEvent(existing.id);
+      } else {
+        const { price } = computeHabitPrice(habit);
+        await addEvent({ id: uid(), type:'habit', name: myName, itemId: habit.id, itemName: habit.name, amount: price, date: today, ts: Date.now() });
+      }
+      renderHabits(); renderHome();
+    });
   }
 
   async function redeemReward(reward){
     if(!reward) return;
     if(!myName){ openNameModal(true); return; }
-    const { balance } = balanceFor(myName);
-    if(balance < reward.cost){ showToast('残金が足りません'); return; }
-    await addEvent({ id: uid(), type:'reward', name: myName, itemId: reward.id, itemName: reward.name, amount: reward.cost, date: todayStr(), ts: Date.now() });
-    renderRewards(); renderHome();
+    requireJoin(async ()=>{
+      const { balance } = balanceFor(myName);
+      if(balance < reward.cost){ showToast('残金が足りません'); return; }
+      await addEvent({ id: uid(), type:'reward', name: myName, itemId: reward.id, itemName: reward.name, amount: reward.cost, date: todayStr(), ts: Date.now() });
+      renderRewards(); renderHome();
+    });
   }
 
   function toggleFavorite(kind, item){
@@ -1062,6 +1121,16 @@
     const b = document.getElementById('group-name-habits');
     if(a) a.textContent = gname;
     if(b) b.textContent = gname;
+
+    const joined = isJoinedToCurrentGroup();
+    ['join-pill-home','join-pill-habits'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el || !currentGid) { if(el) el.style.display='none'; return; }
+      el.style.display = '';
+      el.className = 'join-pill ' + (joined ? 'joined' : 'unjoined');
+      el.textContent = joined ? '参加済み' : '参加する';
+      el.onclick = joined ? null : joinCurrentGroup;
+    });
   }
 
   function renderHabits(){
@@ -1332,13 +1401,16 @@
     if(!el) return;
     const gids = Object.keys(groupsMeta).sort((a,b)=>(groupsMeta[a].createdAt||0)-(groupsMeta[b].createdAt||0));
     if(!gids.length){ el.innerHTML = '<div class="empty">グループがありません</div>'; return; }
-    el.innerHTML = gids.map(gid=>`
-      <div class="group-pick">
-        <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}</div>
-        ${gid===currentGid?'<span class="gp-cur">使用中</span>':''}
+    el.innerHTML = gids.map(gid=>{
+      const isCurrent = gid === currentGid;
+      const status = isCurrent ? (isJoinedToCurrentGroup() ? '<span class="gp-cur">参加済み</span>' : '<span class="gp-cur" style="color:var(--mustard-deep)">未参加</span>') : '';
+      return `<div class="group-pick">
+        <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}${isCurrent?' (表示中)':''}</div>
+        ${status}
         <button class="gp-edit" data-rename="${gid}">名前</button>
         <button class="gp-edit" data-del="${gid}">削除</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     el.querySelectorAll('[data-pick]').forEach(x=> x.addEventListener('click', ()=> switchGroup(x.dataset.pick)));
     el.querySelectorAll('[data-rename]').forEach(x=> x.addEventListener('click', ()=> openGroupNameModal(x.dataset.rename)));
     el.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', ()=> openGroupDeleteModal(x.dataset.del)));
@@ -1518,7 +1590,6 @@
             saveGid();
           }
           attachGroupListeners(currentGid);
-          await registerMember();
         }
         if(!myName) openNameModal(true);
       }
