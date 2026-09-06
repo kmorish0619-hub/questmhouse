@@ -464,7 +464,7 @@
       <h3>AI機能について</h3>
       <div class="setting-note">
         「今日のAIの一言」はホームに1日1回、家族の様子から自動で表示されます(全員が別々に生成しないよう、1日1回だけ呼び出します)。<br><br>
-        習慣の編集画面の「AIへの一言」から、金額についての意見を送るとAIが判断し、最大±30%の範囲で金額に反映します。やり取りの履歴は編集画面に残ります。
+        習慣の編集画面の「AIへの一言」からは、金額・名前・カテゴリなど気になることを自由に送れます。AIが内容を判断し、金額なら最大±30%反映、名前やカテゴリなら提案として表示され、「変更」ボタンで適用できます。やり取りの履歴は編集画面に残ります。
       </div>
     </div>
 
@@ -1141,8 +1141,8 @@
       ${isEdit ? '<div id="m-price-info"></div>' : ''}
       ${isEdit && AI_ENABLED ? `
       <div class="field" style="border-top:1px dashed var(--line); padding-top:14px; margin-top:4px;">
-        <label>AIへの一言(この習慣は簡単なのに高い、など)</label>
-        <textarea id="m-ai-feedback" rows="2" style="width:100%; background:var(--paper-alt); border:1px solid var(--line); border-radius:2px; color:var(--ink); padding:10px; font-family:'Archivo',sans-serif; font-size:14px;" placeholder="例: これは5分で終わるのに高すぎる"></textarea>
+        <label>AIへの一言(金額・名前・カテゴリなど、気になることを自由に)</label>
+        <textarea id="m-ai-feedback" rows="2" style="width:100%; background:var(--paper-alt); border:1px solid var(--line); border-radius:2px; color:var(--ink); padding:10px; font-family:'Archivo',sans-serif; font-size:14px;" placeholder="例: これは5分で終わるのに高すぎる／名前が分かりにくい／家事じゃなくて健康カテゴリでは？"></textarea>
         <button class="btn ghost" id="m-ai-send" style="margin-top:8px;">AIに伝える</button>
         <div id="m-ai-feedback-list" style="margin-top:10px;"></div>
       </div>` : ''}
@@ -1198,11 +1198,25 @@
     if(!box) return;
     const list = (habit.aiFeedback || []).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,5);
     if(!list.length){ box.innerHTML = ''; return; }
-    box.innerHTML = list.map(f => `
+    box.innerHTML = list.map((f,i) => {
+      const catLabel = f.suggestedCategory ? (CATEGORIES.find(c=>c.key===f.suggestedCategory)||{}).label : null;
+      const actions = [];
+      if(f.suggestedName) actions.push(`<button class="gp-edit" data-apply-name="${i}">「${escapeHtml(f.suggestedName)}」に変更</button>`);
+      if(f.suggestedCategory) actions.push(`<button class="gp-edit" data-apply-cat="${i}">「${escapeHtml(catLabel||f.suggestedCategory)}」に変更</button>`);
+      return `
       <div style="border-top:1px dashed var(--line); padding-top:8px; margin-top:8px; font-size:12px;">
         <div style="color:var(--ink);"><b>${escapeHtml(f.name)}</b>: ${escapeHtml(f.text)}</div>
         ${f.aiReply ? `<div style="color:var(--sage); margin-top:4px;">AI: ${escapeHtml(f.aiReply)}</div>` : ''}
-      </div>`).join('');
+        ${actions.length ? `<div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">${actions.join('')}</div>` : ''}
+      </div>`;
+    }).join('');
+    const list5 = list; // closures below reference this
+    box.querySelectorAll('[data-apply-name]').forEach(btn=>{
+      btn.addEventListener('click', ()=> applyAiSuggestion(habit.id, 'name', list5[parseInt(btn.dataset.applyName)].suggestedName));
+    });
+    box.querySelectorAll('[data-apply-cat]').forEach(btn=>{
+      btn.addEventListener('click', ()=> applyAiSuggestion(habit.id, 'category', list5[parseInt(btn.dataset.applyCat)].suggestedCategory));
+    });
   }
 
   async function sendAiFeedback(habit){
@@ -1214,16 +1228,26 @@
     btn.disabled = true; btn.textContent = '考え中…';
 
     const { price, mult } = computeHabitPrice(habit);
-    const prompt = `習慣名: 「${habit.name}」\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n現在の金額: ¥${price}(基準の${mult.toFixed(2)}倍)\n家族からの意見: 「${text}」\n\nこの意見は妥当ですか。習慣名と所要時間から見て、現在の金額水準についてどう考えますか。\n1行目に「調整: X.XX」の形式で、この意見を反映した追加の調整倍率(0.7〜1.3の範囲、変更不要なら1.00)を書き、\n2行目以降に日本語で2文以内の短い返信を書いてください。`;
-    const system = 'あなたは家族の家事・習慣共有アプリの価格アドバイザーです。家族からの意見と習慣の内容を見て、公平な調整を提案してください。指定された出力形式を厳密に守ってください。';
-    const reply = await callAI(system, prompt, 200);
+    const catList = CATEGORIES.map(c=>`${c.key}(${c.label})`).join('、');
+    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n現在の金額: ¥${price}(基準の${mult.toFixed(2)}倍)\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」または「1.00」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n調整: X.XX (金額に関する意見の時だけ0.7〜1.3の範囲で。それ以外は1.00)\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${CATEGORIES.map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信\n\nカテゴリの選択肢: ${catList}`;
+    const system = 'あなたは家族の家事・習慣共有アプリのアシスタントです。家族からの意見(金額・名前・カテゴリなど)を読み取り、妥当な提案をします。指定された出力形式を厳密に守ってください。';
+    const reply = await callAI(system, prompt, 250);
 
     let aiAdjust = habit.aiAdjust || 1;
+    let suggestedName = null, suggestedCategory = null;
     let replyText = '確認しました。';
     if(reply){
-      const m = reply.match(/調整\s*[:：]\s*([0-9]*\.?[0-9]+)/);
-      if(m){ aiAdjust = Math.max(0.7, Math.min(1.3, parseFloat(m[1]))); }
-      replyText = reply.replace(/調整\s*[:：]\s*[0-9]*\.?[0-9]+\s*/,'').trim() || replyText;
+      const mAdj = reply.match(/調整\s*[:：]\s*([0-9]*\.?[0-9]+)/);
+      if(mAdj) aiAdjust = Math.max(0.7, Math.min(1.3, parseFloat(mAdj[1])));
+
+      const mName = reply.match(/提案名\s*[:：]\s*(.+)/);
+      if(mName && !/^なし/.test(mName[1].trim())) suggestedName = mName[1].trim();
+
+      const mCat = reply.match(/提案カテゴリ\s*[:：]\s*(\w+)/);
+      if(mCat && CATEGORIES.some(c=>c.key===mCat[1])) suggestedCategory = mCat[1];
+
+      const mReply = reply.match(/返信\s*[:：]\s*([\s\S]+)/);
+      replyText = (mReply ? mReply[1] : reply).trim() || replyText;
     } else {
       replyText = 'AIに接続できませんでした。少し時間を置いて試してください。';
     }
@@ -1231,7 +1255,10 @@
     const target = catalog.habits.find(h=>h.id===habit.id);
     if(target){
       target.aiAdjust = aiAdjust;
-      target.aiFeedback = (target.aiFeedback || []).concat([{ name: myName, text, ts: Date.now(), aiReply: replyText }]).slice(-10);
+      target.aiFeedback = (target.aiFeedback || []).concat([{
+        name: myName, text, ts: Date.now(), aiReply: replyText,
+        suggestedName, suggestedCategory
+      }]).slice(-10);
       await saveHabits();
     }
     btn.disabled = false; btn.textContent = 'AIに伝える';
@@ -1239,6 +1266,23 @@
     renderAiFeedbackList(target || habit);
     renderPriceInfo(target || habit);
     renderHabits();
+  }
+
+  async function applyAiSuggestion(habitId, field, value){
+    const target = catalog.habits.find(h=>h.id===habitId);
+    if(!target) return;
+    if(field === 'name'){
+      target.name = value;
+      const nameInput = document.getElementById('m-name');
+      if(nameInput) nameInput.value = value;
+    } else if(field === 'category'){
+      target.category = value;
+      const catSelect = document.getElementById('m-cat');
+      if(catSelect) catSelect.value = value;
+    }
+    await saveHabits();
+    renderHabits();
+    showToast('AIの提案を適用しました');
   }
 
   // Shows the current price, why it is what it is, and how it has moved.
