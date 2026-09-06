@@ -345,8 +345,9 @@
     <div class="card">
       <h3>グループ</h3>
       <div id="group-list"></div>
-      <button class="btn ghost" id="add-group-btn" style="margin-top:12px;">新しいグループを作る</button>
-      <div class="setting-note">グループごとに習慣・ごほうび・残高・相場がすべて独立します。家族単位や目的別(ダイエットだけ等)に分けて使えます。</div>
+      <div id="join-action" style="margin-top:14px;"></div>
+      <button class="btn ghost" id="add-group-btn" style="margin-top:10px;">新しいグループを作る</button>
+      <div class="setting-note">グループごとに習慣・ごほうび・残高・相場がすべて独立します。家族単位や目的別(ダイエットだけ等)に分けて使えます。<br><br>グループ名をタップすると表示を切り替えられます。表示するだけでは参加になりません。「参加する」を押して初めてメンバーになります。</div>
     </div>
 
     <div class="card">
@@ -355,7 +356,7 @@
       <div class="setting-note">現在のグループに参加しているメンバーです。</div>
     </div>
 
-    <div class="card">
+    <div class="card" id="withdraw-card">
       <div class="setting-row danger" id="withdraw-btn">
         <span class="srow-text">このグループから脱退する</span>
         <span class="arrow">›</span>
@@ -796,11 +797,14 @@
   }
   // Roster comes from the shared members node (plus anyone with events), so it
   // is identical on every device.
+  // The roster must be identical on every device, so it is derived purely from
+  // shared data: registered members plus anyone with records. Deliberately does
+  // NOT add myName — otherwise you'd still see yourself after withdrawing while
+  // everyone else correctly saw you as gone.
   function rosterNames(){
     const set = new Set();
     Object.values(members).forEach(m => { if(m && m.name) set.add(m.name); });
     events.forEach(e => set.add(e.name));
-    if(myName) set.add(myName);
     return Array.from(set);
   }
   function sumByDateFor(date, name){
@@ -964,20 +968,26 @@
   // ---------- Group management UI ----------
   function openGroupPicker(){
     const gids = Object.keys(groupsMeta).sort((a,b)=>(groupsMeta[a].createdAt||0)-(groupsMeta[b].createdAt||0));
+    const joined = isJoinedToCurrentGroup();
+    const curName = currentGid && groupsMeta[currentGid] ? groupsMeta[currentGid].name : '';
     openModal(`
       <h3>グループを選ぶ</h3>
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 12px;">名前をタップすると表示が切り替わります。表示するだけでは参加になりません。</p>
       <div id="gp-list">
         ${gids.length === 0 ? '<div class="empty">グループがありません</div>' :
           gids.map(gid=>`
             <div class="group-pick">
               <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}</div>
-              ${gid===currentGid?'<span class="gp-cur">使用中</span>':''}
+              ${gid===currentGid?'<span class="gp-cur">表示中</span>':''}
               <button class="gp-edit" data-rename="${gid}">名前</button>
               <button class="gp-edit" data-del="${gid}">削除</button>
             </div>`).join('')}
       </div>
-      <div class="modal-actions"><button class="btn" id="gp-add">新しいグループを作る</button></div>
+      ${currentGid && !joined ? `<div class="modal-actions"><button class="btn" id="gp-join">「${escapeHtml(curName)}」に参加する</button></div>` : ''}
+      <div class="modal-actions"><button class="btn ghost" id="gp-add">新しいグループを作る</button></div>
     `);
+    const jb = document.getElementById('gp-join');
+    if(jb) jb.addEventListener('click', async ()=>{ await joinCurrentGroup(); closeModal(); });
     modalBody.querySelectorAll('[data-pick]').forEach(el=>{
       el.addEventListener('click', async ()=>{ closeModal(); await switchGroup(el.dataset.pick); });
     });
@@ -1398,22 +1408,44 @@
 
   function renderGroupList(){
     const el = document.getElementById('group-list');
-    if(!el) return;
-    const gids = Object.keys(groupsMeta).sort((a,b)=>(groupsMeta[a].createdAt||0)-(groupsMeta[b].createdAt||0));
-    if(!gids.length){ el.innerHTML = '<div class="empty">グループがありません</div>'; return; }
-    el.innerHTML = gids.map(gid=>{
-      const isCurrent = gid === currentGid;
-      const status = isCurrent ? (isJoinedToCurrentGroup() ? '<span class="gp-cur">参加済み</span>' : '<span class="gp-cur" style="color:var(--mustard-deep)">未参加</span>') : '';
-      return `<div class="group-pick">
-        <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}${isCurrent?' (表示中)':''}</div>
-        ${status}
-        <button class="gp-edit" data-rename="${gid}">名前</button>
-        <button class="gp-edit" data-del="${gid}">削除</button>
-      </div>`;
-    }).join('');
-    el.querySelectorAll('[data-pick]').forEach(x=> x.addEventListener('click', ()=> switchGroup(x.dataset.pick)));
-    el.querySelectorAll('[data-rename]').forEach(x=> x.addEventListener('click', ()=> openGroupNameModal(x.dataset.rename)));
-    el.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', ()=> openGroupDeleteModal(x.dataset.del)));
+    if(el){
+      const gids = Object.keys(groupsMeta).sort((a,b)=>(groupsMeta[a].createdAt||0)-(groupsMeta[b].createdAt||0));
+      if(!gids.length){ el.innerHTML = '<div class="empty">グループがありません</div>'; }
+      else {
+        el.innerHTML = gids.map(gid=>{
+          const isCurrent = gid === currentGid;
+          const status = isCurrent
+            ? (isJoinedToCurrentGroup()
+                ? '<span class="gp-cur">参加中</span>'
+                : '<span class="gp-cur" style="color:var(--brick)">未参加</span>')
+            : '';
+          return `<div class="group-pick">
+            <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}${isCurrent?' (表示中)':''}</div>
+            ${status}
+            <button class="gp-edit" data-rename="${gid}">名前</button>
+            <button class="gp-edit" data-del="${gid}">削除</button>
+          </div>`;
+        }).join('');
+        el.querySelectorAll('[data-pick]').forEach(x=> x.addEventListener('click', ()=> switchGroup(x.dataset.pick)));
+        el.querySelectorAll('[data-rename]').forEach(x=> x.addEventListener('click', ()=> openGroupNameModal(x.dataset.rename)));
+        el.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', ()=> openGroupDeleteModal(x.dataset.del)));
+      }
+    }
+
+    // Prominent join / leave control for the group currently on screen.
+    const ja = document.getElementById('join-action');
+    const wc = document.getElementById('withdraw-card');
+    if(!ja) return;
+    if(!currentGid){ ja.innerHTML = ''; if(wc) wc.style.display='none'; return; }
+    const gname = groupsMeta[currentGid] ? groupsMeta[currentGid].name : '';
+    if(isJoinedToCurrentGroup()){
+      ja.innerHTML = `<div class="setting-note" style="margin:0 0 8px;">「${escapeHtml(gname)}」に参加中です。</div>`;
+      if(wc) wc.style.display = '';
+    } else {
+      ja.innerHTML = `<button class="btn" id="join-now-btn">「${escapeHtml(gname)}」に参加する</button>`;
+      document.getElementById('join-now-btn').addEventListener('click', joinCurrentGroup);
+      if(wc) wc.style.display = 'none';   // nothing to withdraw from yet
+    }
   }
 
   function renderResetStatus(){
