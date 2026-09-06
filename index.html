@@ -34,7 +34,7 @@
   /* Flex column instead of a fixed-position footer: the tabbar becomes a normal
      flex child pinned to the bottom of the viewport, so it can't be swallowed by
      the mobile browser's own toolbar showing/hiding. Only .wrap scrolls. */
-  body{ display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+  body{ display:flex; flex-direction:column; height:100dvh; height:calc(var(--app-height, 100vh)); overflow:hidden; }
   h1,h2,h3{ font-family: 'Instrument Serif', serif; font-weight: 400; margin: 0; }
 
   .wrap{ flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch;
@@ -108,6 +108,12 @@
   .trend-tag.up{ background: rgba(139,74,68,.14); color: var(--brick); }
   .trend-tag.down{ background: rgba(75,99,85,.14); color: var(--sage); }
   .reward-info .rmeta{ font-size:12px; color: var(--mustard-deep); font-weight:600; }
+
+  .item-controls{ display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; }
+  .fav-btn{ background:none; border:none; font-size:16px; color: var(--line); cursor:pointer; padding:0 2px; line-height:1; }
+  .fav-btn.on{ color: var(--mustard); }
+  .order-btn{ background:none; border:none; font-size:9px; color: var(--ink-soft); cursor:pointer; padding:1px 3px; line-height:1; }
+  .order-btn:disabled{ opacity:.25; cursor:default; }
 
   .check-btn{ width:36px; height:36px; border-radius:50%; border:2px solid var(--sage); background: var(--paper-alt);
     display:flex; align-items:center; justify-content:center; color: var(--sage); font-size:15px; flex-shrink:0; cursor:pointer;
@@ -287,11 +293,28 @@
         <span class="srow-text">名前: <span id="name-current">-</span></span>
         <span class="arrow">›</span>
       </div>
-      <div class="setting-row danger" id="reset-btn">
-        <span class="srow-text">家族の共有データをリセットする</span>
+      <div class="setting-row" id="leave-btn">
+        <span class="srow-text">このアプリから脱退する</span>
         <span class="arrow">›</span>
       </div>
-      <div class="setting-note">習慣・ごほうび・記録・残高は家族で共有されています。リセットすると家族全員分のデータが削除されます。</div>
+      <div class="setting-note">脱退しても、あなたのこれまでの記録は消えません。この端末に保存された名前だけを忘れます。もう一度同じ名前を入力すれば、そこから再開できます。</div>
+    </div>
+
+    <div class="card">
+      <h3>家族の共有データ</h3>
+      <div id="reset-status"></div>
+      <div class="setting-note" id="reset-explain">習慣・ごほうび・記録・残高は家族で共有されています。リセットには、これまでにアプリを使ったことがある家族全員の承認が必要です。</div>
+    </div>
+
+    <div class="card">
+      <h3>相場の変動ルール</h3>
+      <div class="setting-note">
+        習慣の金額は、過去7日間の家族の実施状況から自動で決まります。<br><br>
+        ・誰も実施していない → 値上がりします<br>
+        ・一人だけがほぼ毎日実施している → 値上がりします(負担が偏っているサイン)<br>
+        ・二人以上でほぼ毎日分担できている → 値下がりします<br>
+        ・登録した金額は「基本金額」で、実際の表示額はここから変動します
+      </div>
     </div>
   </div>
 
@@ -342,12 +365,14 @@
   let db = null;
   let catalogRef = null;
   let eventsRef = null;
+  let resetRequestRef = null;
   if(!FIREBASE_NOT_CONFIGURED){
     try{
       firebase.initializeApp(firebaseConfig);
       db = firebase.database();
       catalogRef = db.ref('catalog');
       eventsRef = db.ref('events');
+      resetRequestRef = db.ref('resetRequest');
     }catch(e){ console.error('Firebase init failed', e); }
   }
 
@@ -361,9 +386,66 @@
   ];
 
   let myName = '';
-  let catalog = { habits: [], rewards: [], goalYear: '', goalMonth: '' };
+  let catalog = { habits: [], rewards: [], goalYear: '', goalMonth: '', seeded: false };
   let events = [];
   let activeTab = 'home';
+  let resetRequest = null; // { requestedBy, requestedAt, approvals: {name:true} }
+  let seedAttempted = false;
+
+  const DEFAULT_HABITS = [
+    { name:'体重を測る', category:'diet', minutes:5, basePrice:50 },
+    { name:'間食を我慢する', category:'diet', minutes:null, basePrice:100 },
+    { name:'野菜から先に食べる', category:'diet', minutes:null, basePrice:50 },
+    { name:'腹八分目を意識する', category:'diet', minutes:null, basePrice:50 },
+    { name:'白米を控えめにする', category:'diet', minutes:null, basePrice:50 },
+    { name:'夜9時以降は食べない', category:'diet', minutes:null, basePrice:100 },
+    { name:'ウォーキング30分', category:'diet', minutes:30, basePrice:150 },
+    { name:'階段を使う', category:'diet', minutes:5, basePrice:50 },
+    { name:'7時間睡眠', category:'health', minutes:null, basePrice:100 },
+    { name:'ストレッチ', category:'health', minutes:10, basePrice:50 },
+    { name:'早寝早起き', category:'health', minutes:null, basePrice:80 },
+    { name:'水を2L飲む', category:'health', minutes:null, basePrice:80 },
+    { name:'歯磨き後にフロス', category:'health', minutes:5, basePrice:30 },
+    { name:'筋トレ', category:'health', minutes:20, basePrice:150 },
+    { name:'瞑想・深呼吸5分', category:'health', minutes:5, basePrice:50 },
+    { name:'日光浴10分', category:'health', minutes:10, basePrice:50 },
+    { name:'皿洗い', category:'chore', minutes:10, basePrice:100 },
+    { name:'洗濯を回す', category:'chore', minutes:5, basePrice:80 },
+    { name:'洗濯物を畳む', category:'chore', minutes:10, basePrice:80 },
+    { name:'掃除機がけ', category:'chore', minutes:15, basePrice:100 },
+    { name:'お風呂掃除', category:'chore', minutes:15, basePrice:100 },
+    { name:'トイレ掃除', category:'chore', minutes:10, basePrice:100 },
+    { name:'ゴミ出し', category:'chore', minutes:5, basePrice:60 },
+    { name:'食事を作る', category:'chore', minutes:30, basePrice:200 },
+    { name:'食材の買い出し', category:'chore', minutes:30, basePrice:150 },
+    { name:'玄関の掃き掃除', category:'chore', minutes:10, basePrice:60 },
+    { name:'子どもの送り迎え', category:'other', minutes:20, basePrice:150 },
+    { name:'子どもと遊ぶ30分', category:'other', minutes:30, basePrice:100 },
+    { name:'読書30分', category:'other', minutes:30, basePrice:80 },
+    { name:'家計簿をつける', category:'other', minutes:10, basePrice:80 }
+  ];
+  const DEFAULT_REWARDS = [
+    { name:'好きなお菓子', cost:300 },
+    { name:'コンビニスイーツ', cost:250 },
+    { name:'カフェでコーヒー', cost:400 },
+    { name:'映画を1本見る', cost:500 },
+    { name:'マンガ1冊購入', cost:600 },
+    { name:'ゲームを1時間する', cost:300 },
+    { name:'お酒を1杯', cost:400 },
+    { name:'マッサージ30分', cost:1000 },
+    { name:'好きな本を買う', cost:800 },
+    { name:'外食ランチ', cost:1000 },
+    { name:'昼寝30分', cost:200 },
+    { name:'趣味の時間1時間', cost:400 },
+    { name:'新しい文房具', cost:500 },
+    { name:'好きな音楽でのんびりタイム', cost:200 },
+    { name:'ネイル・散髪', cost:1500 },
+    { name:'ゲームソフト購入', cost:3000 },
+    { name:'家族で外食', cost:3000 },
+    { name:'ちょっと良いコーヒー豆', cost:700 },
+    { name:'お花を買う', cost:500 },
+    { name:'半日フリー(家事免除)', cost:2000 }
+  ];
 
   const uid = () => Math.random().toString(36).slice(2,9);
   const pad = n => String(n).padStart(2,'0');
@@ -410,13 +492,15 @@
     renderHabits();
     renderRewards();
     if(activeTab === 'stats') renderStats();
+    if(activeTab === 'settings') renderResetStatus();
   }
 
   if(catalogRef){
     catalogRef.on('value', snap=>{
       const val = snap.val();
-      if(val) catalog = Object.assign({ habits: [], rewards: [], goalYear: '', goalMonth: '' }, val);
+      if(val) catalog = Object.assign({ habits: [], rewards: [], goalYear: '', goalMonth: '', seeded:false }, val);
       rerenderCurrent();
+      if(!seedAttempted){ seedAttempted = true; maybeSeedDefaults(); }
     }, e=>console.error('catalog listener error', e));
   }
   if(eventsRef){
@@ -425,6 +509,32 @@
       events = val ? Object.values(val) : [];
       rerenderCurrent();
     }, e=>console.error('events listener error', e));
+  }
+  if(resetRequestRef){
+    resetRequestRef.on('value', snap=>{
+      resetRequest = snap.val();
+      renderResetStatus();
+      maybeFinalizeReset();
+    }, e=>console.error('resetRequest listener error', e));
+  }
+
+  // Fills in a starter set of habits/rewards on first-ever use. Never touches
+  // anything the family has already added — only appends names that don't exist yet.
+  function maybeSeedDefaults(){
+    if(catalog.seeded) return;
+    const existingHabitNames = new Set(catalog.habits.map(h=>h.name));
+    const existingRewardNames = new Set(catalog.rewards.map(r=>r.name));
+    const now = Date.now();
+    const newHabits = DEFAULT_HABITS
+      .filter(d => !existingHabitNames.has(d.name))
+      .map((d,i) => ({ id: uid(), name:d.name, category:d.category, minutes:d.minutes, basePrice:d.basePrice, createdAt: now, order: now+i, favorite:false }));
+    const newRewards = DEFAULT_REWARDS
+      .filter(d => !existingRewardNames.has(d.name))
+      .map((d,i) => ({ id: uid(), name:d.name, cost:d.cost, createdAt: now, order: now+i, favorite:false }));
+    catalog.habits = [...catalog.habits, ...newHabits];
+    catalog.rewards = [...catalog.rewards, ...newRewards];
+    catalog.seeded = true;
+    saveCatalog();
   }
 
   // ---------- Dynamic pricing ----------
@@ -483,6 +593,7 @@
     if(tab==='home') renderHome();
     if(tab==='habits') renderHabits(), renderRewards();
     if(tab==='stats') renderStats();
+    if(tab==='settings') renderResetStatus();
   }
   document.querySelectorAll('.tabbtn').forEach(btn=>{
     btn.addEventListener('click', ()=> showTab(btn.dataset.tab));
@@ -573,7 +684,7 @@
         existing.minutes = minRaw===''?null:parseFloat(minRaw);
         existing.basePrice = basePrice;
       } else {
-        catalog.habits.push({ id: uid(), name, category, minutes: minRaw===''?null:parseFloat(minRaw), basePrice, createdAt: Date.now() });
+        catalog.habits.push({ id: uid(), name, category, minutes: minRaw===''?null:parseFloat(minRaw), basePrice, createdAt: Date.now(), order: Date.now(), favorite:false });
       }
       await saveCatalog(); renderHabits(); closeModal();
     });
@@ -601,7 +712,7 @@
       const cost = parseInt(document.getElementById('m-cost').value) || 0;
       if(!name || cost<=0) return;
       if(isEdit){ existing.name = name; existing.cost = cost; }
-      else { catalog.rewards.push({ id: uid(), name, cost, createdAt: Date.now() }); }
+      else { catalog.rewards.push({ id: uid(), name, cost, createdAt: Date.now(), order: Date.now(), favorite:false }); }
       await saveCatalog(); renderRewards(); closeModal();
     });
     if(isEdit){
@@ -639,6 +750,32 @@
     renderRewards(); renderHome();
   }
 
+  async function toggleFavorite(list, item){
+    item.favorite = !item.favorite;
+    await saveCatalog();
+    if(list === 'habit') renderHabits(); else renderRewards();
+  }
+
+  // Swaps this item's order with its visible neighbor (within the same category
+  // for habits, within the whole list for rewards) — a simple, reliable
+  // alternative to drag-and-drop on mobile.
+  async function moveItem(list, sortedGroup, item, direction){
+    const idx = sortedGroup.findIndex(i => i.id === item.id);
+    const swapIdx = idx + direction;
+    if(swapIdx < 0 || swapIdx >= sortedGroup.length) return;
+    const a = sortedGroup[idx], b = sortedGroup[swapIdx];
+    const tmp = a.order; a.order = b.order; b.order = tmp;
+    await saveCatalog();
+    if(list === 'habit') renderHabits(); else renderRewards();
+  }
+
+  function sortByFavoriteThenOrder(list){
+    return list.slice().sort((a,b)=>{
+      if(!!b.favorite !== !!a.favorite) return (b.favorite?1:0) - (a.favorite?1:0);
+      return (a.order||0) - (b.order||0);
+    });
+  }
+
   // ---------- Renderers: habits / rewards ----------
   function renderHabits(){
     const today = todayStr();
@@ -650,15 +787,20 @@
     const name = myName || '(名無し)';
     let html = '';
     CATEGORIES.forEach(cat=>{
-      const items = catalog.habits.filter(h => (h.category||'other') === cat.key);
+      const items = sortByFavoriteThenOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
       if(items.length === 0) return;
       html += `<div class="cat-label">${cat.label}</div>`;
-      html += items.map(h=>{
+      html += items.map((h,i)=>{
         const done = events.some(e=>e.type==='habit' && e.itemId===h.id && e.name===name && e.date===today);
         const { price, mult } = computeHabitPrice(h);
         const trend = mult >= 1.2 ? '<span class="trend-tag up">品薄</span>' : (mult <= 0.85 ? '<span class="trend-tag down">定番</span>' : '');
         const meta = [h.minutes!=null?`${h.minutes}分`:null].filter(Boolean).join(' ・ ');
         return `<div class="habit-card">
+          <div class="item-controls">
+            <button class="fav-btn ${h.favorite?'on':''}" data-fav="${h.id}">★</button>
+            <button class="order-btn" data-up="${h.id}" ${i===0?'disabled':''}>▲</button>
+            <button class="order-btn" data-down="${h.id}" ${i===items.length-1?'disabled':''}>▼</button>
+          </div>
           <div class="habit-info" data-edit="${h.id}">
             <div class="hname">${escapeHtml(h.name)}</div>
             <div class="hmeta">${meta?meta+' ・ ':''}<span class="price-tag">¥${yen(price)}</span>${trend}</div>
@@ -674,6 +816,18 @@
     el.querySelectorAll('[data-edit]').forEach(row=>{
       row.addEventListener('click', ()=> openHabitModal(catalog.habits.find(h=>h.id===row.dataset.edit)));
     });
+    el.querySelectorAll('[data-fav]').forEach(btn=>{
+      btn.addEventListener('click', ()=> toggleFavorite('habit', catalog.habits.find(h=>h.id===btn.dataset.fav)));
+    });
+    CATEGORIES.forEach(cat=>{
+      const group = sortByFavoriteThenOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
+      group.forEach(h=>{
+        const upBtn = el.querySelector(`[data-up="${h.id}"]`);
+        const downBtn = el.querySelector(`[data-down="${h.id}"]`);
+        if(upBtn) upBtn.addEventListener('click', ()=> moveItem('habit', group, h, -1));
+        if(downBtn) downBtn.addEventListener('click', ()=> moveItem('habit', group, h, 1));
+      });
+    });
   }
 
   function renderRewards(){
@@ -684,9 +838,15 @@
     }
     const name = myName || '(名無し)';
     const { balance } = balanceFor(name);
-    el.innerHTML = catalog.rewards.map(r=>{
+    const items = sortByFavoriteThenOrder(catalog.rewards);
+    el.innerHTML = items.map((r,i)=>{
       const can = balance >= r.cost;
       return `<div class="reward-card">
+        <div class="item-controls">
+          <button class="fav-btn ${r.favorite?'on':''}" data-fav="${r.id}">★</button>
+          <button class="order-btn" data-up="${r.id}" ${i===0?'disabled':''}>▲</button>
+          <button class="order-btn" data-down="${r.id}" ${i===items.length-1?'disabled':''}>▼</button>
+        </div>
         <div class="reward-info" data-edit="${r.id}"><div class="rname">${escapeHtml(r.name)}</div><div class="rmeta">¥${yen(r.cost)}</div></div>
         <button class="redeem-btn" data-redeem="${r.id}" ${can?'':'disabled'}>交換する</button>
       </div>`;
@@ -696,6 +856,15 @@
     });
     el.querySelectorAll('[data-edit]').forEach(row=>{
       row.addEventListener('click', ()=> openRewardModal(catalog.rewards.find(r=>r.id===row.dataset.edit)));
+    });
+    el.querySelectorAll('[data-fav]').forEach(btn=>{
+      btn.addEventListener('click', ()=> toggleFavorite('reward', catalog.rewards.find(r=>r.id===btn.dataset.fav)));
+    });
+    items.forEach((r,i)=>{
+      const upBtn = el.querySelector(`[data-up="${r.id}"]`);
+      const downBtn = el.querySelector(`[data-down="${r.id}"]`);
+      if(upBtn) upBtn.addEventListener('click', ()=> moveItem('reward', items, r, -1));
+      if(downBtn) downBtn.addEventListener('click', ()=> moveItem('reward', items, r, 1));
     });
   }
 
@@ -835,15 +1004,70 @@
 
   // ---------- Settings ----------
   document.getElementById('name-btn').addEventListener('click', ()=> openNameModal(false));
-  document.getElementById('reset-btn').addEventListener('click', ()=>{
+
+  document.getElementById('leave-btn').addEventListener('click', ()=>{
+    openModal(`
+      <h3>このアプリから脱退しますか?</h3>
+      <p style="font-size:13px; color:var(--muted); margin:0 0 16px;">この端末に保存されている名前(「${escapeHtml(myName||'未設定')}」)だけを忘れます。あなたのこれまでの記録や残高は家族の共有データに残ったままです。もう一度同じ名前で登録すれば、続きから使えます。</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cancel-leave">キャンセル</button>
+        <button class="btn danger" id="confirm-leave">脱退する</button>
+      </div>
+    `);
+    document.getElementById('cancel-leave').addEventListener('click', closeModal);
+    document.getElementById('confirm-leave').addEventListener('click', ()=>{
+      myName = '';
+      try{ localStorage.removeItem(PERSONAL_NAME_KEY); }catch(e){}
+      closeModal();
+      renderHome();
+      openNameModal(true);
+    });
+  });
+
+  function renderResetStatus(){
+    const el = document.getElementById('reset-status');
+    if(!el) return;
+    const names = allFamilyNames();
+
+    if(!resetRequest){
+      el.innerHTML = `<div class="setting-row danger" id="reset-btn"><span class="srow-text">家族の共有データをリセットする</span><span class="arrow">›</span></div>`;
+      document.getElementById('reset-btn').addEventListener('click', openResetRequestModal);
+      return;
+    }
+
+    const approvals = resetRequest.approvals || {};
+    const approvedCount = names.filter(n => approvals[n]).length;
+    const iApproved = !!approvals[myName];
+    const rows = names.map(n => `<div class="list-row"><div class="name">${escapeHtml(n)}</div><div class="amt ${approvals[n]?'plus':''}">${approvals[n]?'承認済み':'未承認'}</div></div>`).join('');
+
+    el.innerHTML = `
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">${escapeHtml(resetRequest.requestedBy)}さんがリセットを提案しています(${approvedCount}/${names.length}人が承認)</p>
+      ${rows}
+      <div class="modal-actions" style="margin-top:14px;">
+        ${iApproved ? '' : `<button class="btn" id="approve-reset">自分も承認する</button>`}
+        <button class="btn ghost" id="cancel-reset-request">この提案を取り消す</button>
+      </div>
+    `;
+    if(!iApproved){
+      document.getElementById('approve-reset').addEventListener('click', async ()=>{
+        const next = Object.assign({}, approvals, { [myName]: true });
+        await resetRequestRef.update({ approvals: next }).catch(e=>console.error('approve failed', e));
+      });
+    }
+    document.getElementById('cancel-reset-request').addEventListener('click', async ()=>{
+      await resetRequestRef.remove().catch(e=>console.error('cancel reset request failed', e));
+    });
+  }
+
+  function openResetRequestModal(){
     openModal(`
       <h3>家族の共有データをリセットしますか?</h3>
       <p style="font-size:13px; color:var(--muted); margin:0 0 14px;">習慣・ごほうび・記録・残高など、<b>家族全員分</b>のデータがすべて削除されます。この操作は取り消せません。</p>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">よろしければ、下に「リセット」と入力してください。</p>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">これまでにアプリを使ったことがある家族<b>全員の承認</b>がそろうと実行されます。まず、下に「リセット」と入力して提案してください。</p>
       <div class="field"><input type="text" id="m-reset-confirm" placeholder="ここに「リセット」と入力"></div>
       <div class="modal-actions">
         <button class="btn ghost" id="cancel-reset">キャンセル</button>
-        <button class="btn danger" id="confirm-reset" disabled style="opacity:.4;">リセットする</button>
+        <button class="btn danger" id="confirm-reset" disabled style="opacity:.4;">リセットを提案する</button>
       </div>
     `);
     const input = document.getElementById('m-reset-confirm');
@@ -856,14 +1080,29 @@
     document.getElementById('cancel-reset').addEventListener('click', closeModal);
     confirmBtn.addEventListener('click', async ()=>{
       if(input.value.trim() !== 'リセット') return;
-      catalog = { habits: [], rewards: [], goalYear: '', goalMonth: '' };
-      await saveCatalog();
-      if(eventsRef){ await eventsRef.remove().catch(e=>console.error('events clear failed', e)); }
-      events = [];
-      renderHome(); renderHabits(); renderRewards();
+      const name = myName || '(名無し)';
+      await resetRequestRef.set({ requestedBy: name, requestedAt: Date.now(), approvals: { [name]: true } })
+        .catch(e=>console.error('create reset request failed', e));
       closeModal();
     });
-  });
+  }
+
+  // Runs whenever the request or the family roster changes; executes the reset
+  // only once every currently-known family member has approved.
+  async function maybeFinalizeReset(){
+    if(!resetRequest) return;
+    const names = allFamilyNames();
+    const approvals = resetRequest.approvals || {};
+    const allApproved = names.length > 0 && names.every(n => approvals[n]);
+    if(!allApproved) return;
+    catalog = { habits: [], rewards: [], goalYear: '', goalMonth: '', seeded: true };
+    await saveCatalog();
+    if(eventsRef){ await eventsRef.remove().catch(e=>console.error('events clear failed', e)); }
+    events = [];
+    if(resetRequestRef){ await resetRequestRef.remove().catch(e=>console.error('clear reset request failed', e)); }
+    renderHome(); renderHabits(); renderRewards();
+    showToast('家族全員の承認により、データをリセットしました');
+  }
 
   // ---------- Init ----------
   function init(){
@@ -874,6 +1113,16 @@
     if(FIREBASE_NOT_CONFIGURED) showToast('Firebase未設定です。コード内のfirebaseConfigを設定してください');
     if(!myName) openNameModal(true);
   }
+
+  // Real viewport height, kept in sync with mobile browsers' show/hide toolbar —
+  // far more reliable across iOS Safari versions than `dvh` alone.
+  function setAppHeight(){
+    document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+  }
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', setAppHeight);
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize', setAppHeight); }
 
   init();
 })();
