@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -34,7 +34,9 @@
       repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px),
       var(--bg);
     color: var(--cream);
-    font-family: 'Archivo', sans-serif; -webkit-font-smoothing: antialiased; }
+    font-family: 'Archivo', sans-serif; -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    touch-action: manipulation; }
   /* Flex column instead of a fixed-position footer: the tabbar becomes a normal
      flex child pinned to the bottom of the viewport, so it can't be swallowed by
      the mobile browser's own toolbar showing/hiding. Only .wrap scrolls. */
@@ -123,6 +125,8 @@
     display:flex; align-items:center; justify-content:center; color: var(--sage); font-size:15px; flex-shrink:0; cursor:pointer;
     font-family:'Instrument Serif', serif; transform: rotate(-8deg); transition: all .15s; }
   .check-btn.done{ background: var(--sage); color: var(--cream); border-color: var(--sage); transform: rotate(-8deg) scale(1.05); }
+  .check-btn.multi{ font-size:12px; font-family:'Archivo',sans-serif; font-weight:600; transform:none; }
+  .check-btn.multi.done{ transform:none; }
 
   .redeem-btn{ flex-shrink:0; background: var(--mustard); color:#201A14; border:none; border-radius:2px;
     padding: 10px 15px; font-size:13px; font-weight:700; cursor:pointer; font-family:'Archivo',sans-serif; }
@@ -140,7 +144,7 @@
   .btn{ width:100%; background: var(--sage); color: var(--cream); border:none; border-radius:2px;
     font-family:'Archivo', sans-serif; font-size:15px; font-weight:600; padding:13px; cursor:pointer; letter-spacing:.02em; }
   .btn.danger{ background: var(--brick); }
-  .btn.ghost{ background:none; border:1px solid var(--line-dark); color: var(--cream); font-family:'Archivo',sans-serif; font-weight:500; font-size:14px; }
+  .btn.ghost{ background:none; border:1px solid var(--line); color: var(--ink); font-family:'Archivo',sans-serif; font-weight:500; font-size:14px; }
 
   .setting-row{ display:flex; align-items:center; justify-content:space-between; padding:15px 4px;
     border-bottom:1px dashed var(--line); cursor:pointer; }
@@ -211,6 +215,40 @@
   .join-pill{ font-size:11px; padding:5px 10px; border-radius:12px; flex-shrink:0; font-family:'Archivo',sans-serif; }
   .join-pill.joined{ color: var(--sage); border:1px solid var(--sage); background: rgba(75,99,85,.12); }
   .join-pill.unjoined{ color: #201A14; background: var(--mustard); cursor:pointer; font-weight:600; border:none; }
+
+  .select-bar{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .select-bar button{ background:none; border:1px solid var(--line-dark); color: var(--mustard);
+    border-radius:2px; padding:6px 12px; font-size:12px; cursor:pointer; font-family:'Archivo',sans-serif; }
+  .select-bar button.danger-mini{ color: var(--cream); background: var(--brick); border-color: var(--brick); }
+  .select-bar button:disabled{ opacity:.4; cursor:default; }
+  .select-bar .sel-count{ flex:1; font-size:12px; color: var(--muted); }
+  .pick-box{ width:22px; height:22px; border-radius:3px; border:2px solid var(--sage); background: var(--paper-alt);
+    display:flex; align-items:center; justify-content:center; color: var(--sage); font-size:13px;
+    flex-shrink:0; cursor:pointer; }
+  .pick-box.on{ background: var(--sage); color: var(--cream); }
+
+  /* ---------- Calendar ---------- */
+  .cal-head{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:4px; }
+  .cal-head div{ text-align:center; font-size:10px; color: var(--ink-soft); padding:3px 0; }
+  .cal-head div.sun{ color: var(--brick); }
+  .cal-head div.sat{ color: #3E6B8B; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .cal-cell{ aspect-ratio:1; border:1px solid var(--line); border-radius:3px; background: var(--paper-alt);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    cursor:pointer; padding:2px; position:relative; }
+  .cal-cell.empty{ border:none; background:none; cursor:default; }
+  .cal-cell .dnum{ font-size:11px; color: var(--ink); line-height:1; }
+  .cal-cell.today{ border-color: var(--mustard); border-width:2px; }
+  .cal-cell.sel{ background: var(--sage); }
+  .cal-cell.sel .dnum{ color: var(--cream); }
+  .cal-cell .dots{ display:flex; gap:2px; flex-wrap:wrap; justify-content:center; min-height:5px; }
+  .dot{ width:5px; height:5px; border-radius:50%; display:inline-block; background: var(--line); }
+  .dot.lv1{ background:#A8BFB0; } .dot.lv2{ background:#6B8873; } .dot.lv3{ background: var(--sage); }
+  .dot.spend{ background: var(--brick); }
+  .cal-legend{ display:flex; gap:14px; justify-content:center; margin-top:12px; font-size:11px; color: var(--ink-soft); }
+  .cal-legend span{ display:flex; align-items:center; gap:4px; }
+  .cal-person{ font-family:'Instrument Serif',serif; font-size:15px; color: var(--ink); margin:14px 0 6px; }
+  .cal-person:first-child{ margin-top:0; }
 </style>
 </head>
 <body>
@@ -228,6 +266,14 @@
       </div>
       <span class="join-pill" id="join-pill-home"></span>
       <button id="group-switch-home">切替</button>
+    </div>
+
+    <div class="card" id="ai-comment-card" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+        <h3 style="margin:0">今日のAIの一言</h3>
+        <button class="gp-edit" id="ai-comment-refresh">更新</button>
+      </div>
+      <div id="ai-comment-text" class="setting-note" style="margin:0;"></div>
     </div>
 
     <div class="card">
@@ -293,11 +339,39 @@
       <button class="subtab sel" data-sub="habit">習慣</button>
       <button class="subtab" data-sub="reward">ごほうび</button>
     </div>
+    <div class="select-bar">
+      <button id="select-toggle">まとめて選ぶ</button>
+      <span class="sel-count" id="sel-count"></span>
+      <button id="select-all" style="display:none">全選択</button>
+      <button id="select-delete" class="danger-mini" style="display:none">削除</button>
+    </div>
     <div id="habit-list"></div>
     <div id="reward-list" style="display:none"></div>
   </div>
 
   <!-- ============ STATS ============ -->
+  <!-- ============ CALENDAR ============ -->
+  <div class="panel" id="panel-calendar">
+    <div class="topbar"><h1>カレンダー</h1></div>
+    <div class="card">
+      <div class="stat-nav">
+        <button id="cal-prev">‹</button>
+        <span class="label" id="cal-label">2026 / 9</span>
+        <button id="cal-next">›</button>
+      </div>
+      <div id="calendar-grid"></div>
+      <div class="cal-legend">
+        <span><i class="dot lv1"></i>少ない</span>
+        <span><i class="dot lv2"></i></span>
+        <span><i class="dot lv3"></i>多い</span>
+      </div>
+    </div>
+    <div class="card" id="cal-detail-card">
+      <h3 id="cal-detail-title">日付を選んでください</h3>
+      <div id="cal-detail"></div>
+    </div>
+  </div>
+
   <div class="panel" id="panel-stats">
     <div class="topbar"><h1>達成状況</h1></div>
     <p class="setting-note" style="margin-bottom:14px;">このグループでの、あなた自身の記録の推移です</p>
@@ -347,7 +421,7 @@
       <div id="group-list"></div>
       <div id="join-action" style="margin-top:14px;"></div>
       <button class="btn ghost" id="add-group-btn" style="margin-top:10px;">新しいグループを作る</button>
-      <div class="setting-note">グループごとに習慣・ごほうび・残高・相場がすべて独立します。家族単位や目的別(ダイエットだけ等)に分けて使えます。<br><br>グループ名をタップすると表示を切り替えられます。表示するだけでは参加になりません。「参加する」を押して初めてメンバーになります。</div>
+      <div class="setting-note">グループごとに習慣・ごほうび・残高・相場がすべて独立します。家族単位や目的別(ダイエットだけ等)に分けて使えます。<br><br>グループ名をタップすると表示を切り替えられます。表示するだけでは参加になりません。「参加する」を押して初めてメンバーになります。<br><br>グループの作成は自由にできますが、<b>削除にはメンバー全員の承認が必要</b>です。</div>
     </div>
 
     <div class="card">
@@ -364,22 +438,33 @@
       <div class="setting-note">あなたの名前に紐づく達成・交換の記録を、このグループから<b>完全に削除</b>します。この操作は取り消せません。ログアウトとは異なり、データ自体が消える点にご注意ください。他のグループの記録は残ります。</div>
     </div>
 
-    <div class="card">
-      <h3>グループの共有データ</h3>
+    <div class="card" id="delete-request-card">
+      <h3>グループの削除申請</h3>
       <div id="reset-status"></div>
-      <div class="setting-note" id="reset-explain">習慣・ごほうび・記録・残高はグループ内で共有されています。リセットには、グループの登録メンバー全員の承認が必要です。</div>
+      <div class="setting-note">グループの削除には、登録メンバー全員の承認が必要です。承認がそろうと、そのグループの習慣・ごほうび・記録・残高がすべて削除されます。</div>
     </div>
 
     <div class="card">
       <h3>相場の変動ルール</h3>
       <div class="setting-note">
-        習慣の金額は、<b>同じグループ内</b>の過去7日間の実施状況から自動で決まります。<br><br>
-        ・誰も実施していない → 値上がりします<br>
-        ・一人だけがほぼ毎日実施している → 値上がりします(負担が偏っているサイン)<br>
-        ・二人以上でほぼ毎日分担できている → 値下がりします<br>
-        ・登録した金額は「基本金額」で、実際の表示額はここから変動します<br>
-        ・変動幅は基本金額の0.5倍〜2.0倍の範囲に収まります<br>
-        ・追加から24時間は基本金額のまま変動しません
+        金額は<b>1円単位</b>で常に変動し、同じグループ内の記録だけで計算されます。<br><br>
+        <b>1. 習慣ごとの「本来のペース」を見ます</b><br>
+        毎日やるもの(食事・皿洗い)と、たまにやるもの(布団干し・窓拭き)を区別します。名前と実際の記録から自動で判断しますが、編集画面で「何日に1回やりたいか」を指定すればそちらが優先されます。<br><br>
+        <b>2. ペースより遅れていると値上がりします</b><br>
+        毎日やるものは1日空けば上がり始めますが、週1のものは7日周期を基準に判断するので、5日空いた程度では上がりません。やり忘れが続くほど高くなり、自然と目が向くようになります。<br><br>
+        <b>3. 手間も考慮します</b><br>
+        名前(「作る」「掃除」など)と所要時間から、その作業の重さを推定して金額に反映します。<br><br>
+        <b>4. 偏りを調整します</b><br>
+        一人に集中していると値上がり、2人以上で分担できていると値下がりします。<br><br>
+        変動幅は基本金額の0.5倍〜2.5倍まで。追加から24時間は基本金額のままです。習慣の編集画面を開くと、その習慣の価格推移グラフと、いまの金額になっている理由の内訳が見られます。
+      </div>
+    </div>
+
+    <div class="card" id="ai-info-card">
+      <h3>AI機能について</h3>
+      <div class="setting-note">
+        「今日のAIの一言」はホームに1日1回、家族の様子から自動で表示されます(全員が別々に生成しないよう、1日1回だけ呼び出します)。<br><br>
+        習慣の編集画面の「AIへの一言」から、金額についての意見を送るとAIが判断し、最大±30%の範囲で金額に反映します。やり取りの履歴は編集画面に残ります。
       </div>
     </div>
 
@@ -409,6 +494,9 @@
   <button class="tabbtn" data-tab="habits"><span class="ico">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h8l2 2v12H5V3Z"/><path d="M8 8h5M8 11h5M8 14h3"/></svg>
   </span>達成する</button>
+  <button class="tabbtn" data-tab="calendar"><span class="ico">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="14" height="12.5" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/></svg>
+  </span>カレンダー</button>
   <button class="tabbtn" data-tab="stats"><span class="ico">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5V10M10 16.5V4.5M16 16.5v-8"/><path d="M3 17.5h14"/></svg>
   </span>達成状況</button>
@@ -440,6 +528,28 @@
   };
   const NOT_CONFIGURED = firebaseConfig.apiKey === "YOUR_API_KEY";
 
+  // AI relay (Cloudflare Worker) — keeps the real Anthropic key off the client.
+  const WORKER_URL = "https://quest-ai-relay.kmorish0619.workers.dev";
+  const APP_SHARED_SECRET = "quest-ai-morishitake";
+  const AI_ENABLED = !!WORKER_URL;
+
+  async function callAI(system, prompt, maxTokens){
+    if(!AI_ENABLED) return null;
+    try{
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Key': APP_SHARED_SECRET },
+        body: JSON.stringify({ system, prompt, maxTokens })
+      });
+      if(!res.ok) throw new Error('status ' + res.status);
+      const data = await res.json();
+      return (data && data.text) ? data.text.trim() : null;
+    }catch(e){
+      console.error('AI call failed', e);
+      return null;
+    }
+  }
+
   let db = null;
   if(!NOT_CONFIGURED){
     try{
@@ -469,9 +579,13 @@
   let catalog = emptyCatalog();
   let events = [];
   let members = {};                    // { encodedName: {name, joinedAt} }
-  let resetRequest = null;
+  let deleteRequest = null;
+  let aiComment = null;         // { date, text, generating, generatedBy }
+  let aiCommentAttempted = false;
   let activeTab = 'home';
   let subTab = 'habit';
+  let selectMode = false;
+  let picked = new Set();
   let favH = {};                       // { gid: [habitId] }
   let favR = {};
   let groupListeners = [];
@@ -589,7 +703,9 @@
     catalog = emptyCatalog();
     events = [];
     members = {};
-    resetRequest = null;
+    deleteRequest = null;
+    aiComment = null;
+    aiCommentAttempted = false;
     renderAll();
     if(!db || !gid) return;
 
@@ -622,13 +738,21 @@
     }, e=>console.error('members listener', e));
     groupListeners.push({ref:mRef, cb:mCb});
 
-    const rRef = gRef(gid).child('resetRequest');
+    const rRef = gRef(gid).child('deleteRequest');
     const rCb = rRef.on('value', snap=>{
-      resetRequest = snap.val();
+      deleteRequest = snap.val();
       renderResetStatus();
-      maybeFinalizeReset();
-    }, e=>console.error('resetRequest listener', e));
+      maybeFinalizeDelete();
+    }, e=>console.error('deleteRequest listener', e));
     groupListeners.push({ref:rRef, cb:rCb});
+
+    const aRef = gRef(gid).child('aiComment');
+    const aCb = aRef.on('value', snap=>{
+      aiComment = snap.val();
+      renderAiComment();
+      maybeGenerateDailyComment();
+    }, e=>console.error('aiComment listener', e));
+    groupListeners.push({ref:aRef, cb:aCb});
   }
 
   async function switchGroup(gid){
@@ -767,22 +891,152 @@
     }
     return out;
   }
-  function computeHabitPrice(habit){
-    const base = habit.basePrice || 0;
-    if(habit.createdAt && (Date.now() - habit.createdAt) < 24*3600*1000) return { price: base, mult: 1 };
-    const days = recentDates();
-    const recent = events.filter(e => e.type==='habit' && e.itemId===habit.id && days.includes(e.date));
-    const activeDays = new Set(recent.map(e=>e.date)).size;
-    const people = new Set(recent.map(e=>e.name)).size;
+  // Keyword hints used to guess how demanding a habit is and how often it is
+  // normally expected. This is a heuristic, not real language understanding —
+  // an explicit cadence set by the user always overrides it.
+  const EFFORT_HINTS = [
+    { re: /(作る|料理|自炊|調理|弁当)/,            effort: 1.35, cadence: 1 },
+    { re: /(掃除|そうじ|磨|拭|片付|整理)/,          effort: 1.20, cadence: 3 },
+    { re: /(洗濯|洗い|干す|畳|たた)/,              effort: 1.15, cadence: 1 },
+    { re: /(買い物|買い出し|送り|迎え)/,            effort: 1.25, cadence: 3 },
+    { re: /(筋トレ|ジム|ラン|走|トレーニング)/,      effort: 1.30, cadence: 2 },
+    { re: /(ウォーキング|散歩|歩)/,                effort: 1.10, cadence: 1 },
+    { re: /(ゴミ|ごみ)/,                          effort: 0.95, cadence: 3 },
+    { re: /(布団|シーツ|カーテン|窓|換気扇|排水|草)/, effort: 1.20, cadence: 7 },
+    { re: /(測る|計る|記録|つける|飲む|読む)/,       effort: 0.85, cadence: 1 },
+    { re: /(我慢|控え|やめる|抜き)/,               effort: 1.10, cadence: 1 },
+    { re: /(ストレッチ|瞑想|深呼吸|日光)/,          effort: 0.90, cadence: 1 },
+    { re: /(睡眠|早寝|早起き|眠)/,                 effort: 1.00, cadence: 1 }
+  ];
 
-    const neglectAdj = (1 - activeDays / WINDOW_DAYS) * 0.5;
-    let burdenAdj = 0;
-    if(activeDays >= 4){
-      if(people === 1) burdenAdj = 0.3 * (activeDays / WINDOW_DAYS);
-      else if(people >= 2) burdenAdj = -0.25 * (activeDays / WINDOW_DAYS);
+  // Longer window than before so weekly/monthly chores are judged fairly.
+  const LONG_WINDOW = 28;
+
+  function habitProfile(habit){
+    let effort = 1, cadence = null, source = 'ふつうの手間として扱っています';
+    for(const h of EFFORT_HINTS){
+      if(h.re.test(habit.name)){
+        effort = h.effort; cadence = h.cadence;
+        source = `名前から「${h.re.source.replace(/[()\\|]/g,' ').trim().split(/\s+/)[0]}」系の作業と判断`;
+        break;
+      }
     }
-    let mult = Math.max(0.5, Math.min(2.0, 1 + neglectAdj + burdenAdj));
-    return { price: Math.max(10, Math.round(base * mult / 10) * 10), mult };
+    if(habit.minutes != null){
+      // Time is a stronger signal than the name when it is given.
+      effort *= (0.85 + Math.min(habit.minutes, 60) / 60 * 0.5);
+      source += `／所要${habit.minutes}分を考慮`;
+    }
+    // An explicit setting always wins over the guess.
+    if(habit.cadenceDays) { cadence = habit.cadenceDays; source += '／実施間隔は手動設定'; }
+    if(!cadence) cadence = observedCadence(habit) || 1;
+    return { effort, cadence, source };
+  }
+
+  // Learns the habit's own rhythm from history: the typical gap between times
+  // anyone did it. This is what lets 布団干し (weekly) avoid being punished for
+  // not happening daily.
+  function observedCadence(habit){
+    const dates = [...new Set(events.filter(e=>e.type==='habit'&&e.itemId===habit.id).map(e=>e.date))].sort();
+    if(dates.length < 3) return null;
+    const gaps = [];
+    for(let i=1;i<dates.length;i++){
+      gaps.push(Math.round((new Date(dates[i]) - new Date(dates[i-1])) / 86400000));
+    }
+    gaps.sort((a,b)=>a-b);
+    return Math.max(1, Math.min(30, gaps[Math.floor(gaps.length/2)]));  // median gap
+  }
+
+  function daysSinceLast(habit, asOf){
+    const dates = events.filter(e=>e.type==='habit'&&e.itemId===habit.id).map(e=>e.date).sort();
+    if(!dates.length) return null;
+    return Math.round((new Date(asOf) - new Date(dates[dates.length-1])) / 86400000);
+  }
+
+  // Full pricing model. Returns the price plus a plain-language explanation of
+  // every factor, so the app can tell the family WHY something costs what it does.
+  // `asOf` defaults to today; priceHistory() passes past dates to reconstruct
+  // what the price would have looked like then.
+  function computeHabitPrice(habit, asOf){
+    asOf = asOf || todayStr();
+    const base = habit.basePrice || 0;
+    const prof = habitProfile(habit);
+    const reasons = [];
+
+    if(habit.createdAt && (new Date(asOf) - habit.createdAt) < 24*3600*1000){
+      return { price: base, mult: 1, profile: prof,
+               reasons: ['追加から24時間は基本金額のままです'] };
+    }
+
+    let mult = 1;
+
+    // 1) How demanding the task itself looks.
+    if(prof.effort !== 1){
+      mult *= prof.effort;
+      reasons.push(prof.effort > 1
+        ? `手間のかかる作業と判断し ${Math.round((prof.effort-1)*100)}% 上乗せ`
+        : `軽めの作業と判断し ${Math.round((1-prof.effort)*100)}% 割引`);
+    }
+
+    // 2) MAIN DRIVER: how overdue it is against its own rhythm. A daily task is
+    //    late after 1 day; a weekly one only after 7. The longer it is left,
+    //    the more it pays — which is what makes forgotten chores get noticed.
+    const gap = daysSinceLast(habit, asOf);
+    if(gap == null){
+      mult *= 1.3;
+      reasons.push('まだ一度も実施されていないため 30% 上乗せ');
+    } else if(gap > prof.cadence){
+      const overdue = gap / prof.cadence;                 // 2.0 = twice as late
+      const bump = Math.min(1.0, (overdue - 1) * 0.5);    // caps at +100%
+      mult *= (1 + bump);
+      reasons.push(`本来${prof.cadence}日に1回のところ${gap}日空いており ${Math.round(bump*100)}% 値上がり`);
+    } else {
+      const fresh = (1 - gap / prof.cadence) * 0.15;
+      mult *= (1 - fresh);
+      reasons.push(`${gap === 0 ? '今日' : gap + '日前'}に実施済みで、ペースを保てています`);
+    }
+
+    // 3) Who is carrying it, judged over a window sized to its own rhythm.
+    const window = Math.max(WINDOW_DAYS, Math.min(LONG_WINDOW, prof.cadence * 4));
+    const since = new Date(asOf); since.setDate(since.getDate() - window + 1);
+    const recent = events.filter(e => e.type==='habit' && e.itemId===habit.id && e.date >= localDate(since) && e.date <= asOf);
+    const doers = {};
+    recent.forEach(e => { doers[e.name] = (doers[e.name]||0) + 1; });
+    const people = Object.keys(doers).length;
+    if(recent.length >= 2){
+      if(people === 1){
+        mult *= 1.25;
+        reasons.push(`${Object.keys(doers)[0]}さん一人に偏っているため 25% 値上がり`);
+      } else if(people >= 3){
+        mult *= 0.85;
+        reasons.push(`${people}人で分担できているため 15% 値下がり`);
+      } else {
+        mult *= 0.92;
+        reasons.push('2人で分担できているため 8% 値下がり');
+      }
+    }
+
+    // 4) AI feedback adjustment, if the family has weighed in on this habit.
+    if(habit.aiAdjust && habit.aiAdjust !== 1){
+      mult *= habit.aiAdjust;
+      reasons.push(`家族からの意見を受けたAIの判断で ${habit.aiAdjust > 1 ? '上乗せ' : '割引'}(${habit.aiAdjust.toFixed(2)}倍)`);
+    }
+
+    mult = Math.max(0.5, Math.min(2.5, mult));
+    return { price: Math.max(1, Math.round(base * mult)), mult, profile: prof, reasons };
+  }
+
+  // Rebuilds what the price WOULD have been on a past date, so we can chart it.
+  function priceHistory(habit, days){
+    const out = [];
+    const realEvents = events;
+    for(let i=days-1; i>=0; i--){
+      const d = new Date(); d.setDate(d.getDate()-i);
+      const asOf = localDate(d);
+      events = realEvents.filter(e => e.date <= asOf);
+      out.push({ date: asOf, price: computeHabitPrice(habit, asOf).price });
+    }
+    events = realEvents;
+    return out;
   }
 
   // ---------- Derived ----------
@@ -881,25 +1135,41 @@
         </select>
       </div>
       <div class="field"><label>時間(分・任意)</label><input type="number" id="m-min" value="${isEdit&&existing.minutes!=null?existing.minutes:''}" placeholder="10"></div>
+      <div class="field"><label>1日に達成できる回数</label><input type="number" id="m-daily" min="1" max="50" value="${isEdit&&existing.dailyLimit?existing.dailyLimit:1}" placeholder="1"></div>
+      <div class="field"><label>本来の実施ペース(何日に1回・任意)</label><input type="number" id="m-cadence" min="1" max="60" value="${isEdit&&existing.cadenceDays?existing.cadenceDays:''}" placeholder="毎日なら1、週1なら7(空欄なら自動判定)"></div>
       <div class="field"><label>基本金額(相場の基準額。実際の金額は需要と供給で変動します)</label><input type="number" id="m-reward" value="${isEdit?existing.basePrice:''}" placeholder="100"></div>
+      ${isEdit ? '<div id="m-price-info"></div>' : ''}
+      ${isEdit && AI_ENABLED ? `
+      <div class="field" style="border-top:1px dashed var(--line); padding-top:14px; margin-top:4px;">
+        <label>AIへの一言(この習慣は簡単なのに高い、など)</label>
+        <textarea id="m-ai-feedback" rows="2" style="width:100%; background:var(--paper-alt); border:1px solid var(--line); border-radius:2px; color:var(--ink); padding:10px; font-family:'Archivo',sans-serif; font-size:14px;" placeholder="例: これは5分で終わるのに高すぎる"></textarea>
+        <button class="btn ghost" id="m-ai-send" style="margin-top:8px;">AIに伝える</button>
+        <div id="m-ai-feedback-list" style="margin-top:10px;"></div>
+      </div>` : ''}
       <div class="modal-actions">
         ${isEdit ? '<button class="btn danger" id="m-delete">削除</button>' : ''}
         <button class="btn" id="m-save">保存</button>
       </div>
     `);
+    if(isEdit){ renderPriceInfo(existing); renderAiFeedbackList(existing); }
+    const aiSend = document.getElementById('m-ai-send');
+    if(aiSend) aiSend.addEventListener('click', ()=> sendAiFeedback(existing));
     document.getElementById('m-save').addEventListener('click', async ()=>{
       const name = document.getElementById('m-name').value.trim();
       const category = document.getElementById('m-cat').value;
       const minRaw = document.getElementById('m-min').value;
       const basePrice = parseInt(document.getElementById('m-reward').value) || 0;
+      const dailyLimit = Math.max(1, Math.min(50, parseInt(document.getElementById('m-daily').value) || 1));
+      const cadRaw = document.getElementById('m-cadence').value;
+      const cadenceDays = cadRaw === '' ? null : Math.max(1, Math.min(60, parseInt(cadRaw)));
       if(!name || basePrice<=0){ showToast('名前と基本金額を入力してください'); return; }
       const minutes = minRaw === '' ? null : parseFloat(minRaw);
       if(isEdit){
         const t = catalog.habits.find(h=>h.id===existing.id);
-        if(t){ t.name=name; t.category=category; t.minutes=minutes; t.basePrice=basePrice; }
+        if(t){ t.name=name; t.category=category; t.minutes=minutes; t.basePrice=basePrice; t.dailyLimit=dailyLimit; t.cadenceDays=cadenceDays; }
       } else {
         const maxOrder = catalog.habits.reduce((m,h)=>Math.max(m,h.order||0), 0);
-        catalog.habits.push({ id: uid(), name, category, minutes, basePrice, createdAt: Date.now(), order: maxOrder + 1 });
+        catalog.habits.push({ id: uid(), name, category, minutes, basePrice, dailyLimit, cadenceDays, createdAt: Date.now(), order: maxOrder + 1 });
       }
       await saveHabits(); renderHabits(); closeModal();
     });
@@ -920,6 +1190,93 @@
         });
       });
     }
+  }
+
+  // ---------- AI feedback on a habit's fairness ----------
+  function renderAiFeedbackList(habit){
+    const box = document.getElementById('m-ai-feedback-list');
+    if(!box) return;
+    const list = (habit.aiFeedback || []).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,5);
+    if(!list.length){ box.innerHTML = ''; return; }
+    box.innerHTML = list.map(f => `
+      <div style="border-top:1px dashed var(--line); padding-top:8px; margin-top:8px; font-size:12px;">
+        <div style="color:var(--ink);"><b>${escapeHtml(f.name)}</b>: ${escapeHtml(f.text)}</div>
+        ${f.aiReply ? `<div style="color:var(--sage); margin-top:4px;">AI: ${escapeHtml(f.aiReply)}</div>` : ''}
+      </div>`).join('');
+  }
+
+  async function sendAiFeedback(habit){
+    const ta = document.getElementById('m-ai-feedback');
+    const text = ta.value.trim();
+    if(!text) return;
+    if(!myName){ openNameModal(true); return; }
+    const btn = document.getElementById('m-ai-send');
+    btn.disabled = true; btn.textContent = '考え中…';
+
+    const { price, mult } = computeHabitPrice(habit);
+    const prompt = `習慣名: 「${habit.name}」\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n現在の金額: ¥${price}(基準の${mult.toFixed(2)}倍)\n家族からの意見: 「${text}」\n\nこの意見は妥当ですか。習慣名と所要時間から見て、現在の金額水準についてどう考えますか。\n1行目に「調整: X.XX」の形式で、この意見を反映した追加の調整倍率(0.7〜1.3の範囲、変更不要なら1.00)を書き、\n2行目以降に日本語で2文以内の短い返信を書いてください。`;
+    const system = 'あなたは家族の家事・習慣共有アプリの価格アドバイザーです。家族からの意見と習慣の内容を見て、公平な調整を提案してください。指定された出力形式を厳密に守ってください。';
+    const reply = await callAI(system, prompt, 200);
+
+    let aiAdjust = habit.aiAdjust || 1;
+    let replyText = '確認しました。';
+    if(reply){
+      const m = reply.match(/調整\s*[:：]\s*([0-9]*\.?[0-9]+)/);
+      if(m){ aiAdjust = Math.max(0.7, Math.min(1.3, parseFloat(m[1]))); }
+      replyText = reply.replace(/調整\s*[:：]\s*[0-9]*\.?[0-9]+\s*/,'').trim() || replyText;
+    } else {
+      replyText = 'AIに接続できませんでした。少し時間を置いて試してください。';
+    }
+
+    const target = catalog.habits.find(h=>h.id===habit.id);
+    if(target){
+      target.aiAdjust = aiAdjust;
+      target.aiFeedback = (target.aiFeedback || []).concat([{ name: myName, text, ts: Date.now(), aiReply: replyText }]).slice(-10);
+      await saveHabits();
+    }
+    btn.disabled = false; btn.textContent = 'AIに伝える';
+    ta.value = '';
+    renderAiFeedbackList(target || habit);
+    renderPriceInfo(target || habit);
+    renderHabits();
+  }
+
+  // Shows the current price, why it is what it is, and how it has moved.
+  function renderPriceInfo(habit){
+    const box = document.getElementById('m-price-info');
+    if(!box) return;
+    const { price, mult, profile, reasons } = computeHabitPrice(habit);
+    const hist = priceHistory(habit, 30);
+    const vals = hist.map(h=>h.price);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = (max - min) || 1;
+    const W = 560, H = 90, PAD = 8;
+    const step = vals.length > 1 ? (W - PAD*2) / (vals.length - 1) : 0;
+    const pts = vals.map((v,i)=>{
+      const x = PAD + i*step;
+      const y = H - PAD - ((v - min)/range) * (H - PAD*2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    box.innerHTML = `
+      <div style="border-top:1px dashed var(--line); margin-top:6px; padding-top:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+          <span style="font-size:12px; color:var(--ink-soft)">いまの金額</span>
+          <span class="price-tag" style="font-size:22px">¥${yen(price)}</span>
+        </div>
+        <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="background:var(--paper-alt); border-radius:3px;">
+          <polyline points="${pts}" fill="none" stroke="var(--mustard-deep)" stroke-width="2"/>
+        </svg>
+        <div style="font-size:11px; color:var(--ink-soft); display:flex; justify-content:space-between; margin-top:4px;">
+          <span>30日前 ¥${yen(vals[0])}</span><span>最安 ¥${yen(min)} / 最高 ¥${yen(max)}</span>
+        </div>
+        <div style="font-size:12px; color:var(--ink-soft); margin-top:12px; line-height:1.7;">
+          <b>この習慣の見立て</b><br>${escapeHtml(profile.source)}<br>
+          想定ペース: ${profile.cadence}日に1回<br><br>
+          <b>金額の内訳(基本 ¥${yen(habit.basePrice)} × ${mult.toFixed(2)})</b><br>
+          ${reasons.map(r=>'・'+escapeHtml(r)).join('<br>')}
+        </div>
+      </div>`;
   }
 
   function openRewardModal(existing){
@@ -980,7 +1337,6 @@
               <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}</div>
               ${gid===currentGid?'<span class="gp-cur">表示中</span>':''}
               <button class="gp-edit" data-rename="${gid}">名前</button>
-              <button class="gp-edit" data-del="${gid}">削除</button>
             </div>`).join('')}
       </div>
       ${currentGid && !joined ? `<div class="modal-actions"><button class="btn" id="gp-join">「${escapeHtml(curName)}」に参加する</button></div>` : ''}
@@ -993,9 +1349,6 @@
     });
     modalBody.querySelectorAll('[data-rename]').forEach(el=>{
       el.addEventListener('click', ()=> openGroupNameModal(el.dataset.rename));
-    });
-    modalBody.querySelectorAll('[data-del]').forEach(el=>{
-      el.addEventListener('click', ()=> openGroupDeleteModal(el.dataset.del));
     });
     document.getElementById('gp-add').addEventListener('click', ()=> openGroupNameModal(null));
   }
@@ -1033,55 +1386,27 @@
     });
   }
 
-  function openGroupDeleteModal(gid){
-    const gname = groupsMeta[gid] ? groupsMeta[gid].name : '';
-    openModal(`
-      <h3>グループ「${escapeHtml(gname)}」を削除しますか?</h3>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">このグループの習慣・ごほうび・記録・残高が<b>すべて完全に削除</b>されます。他のグループには影響しません。この操作は取り消せません。</p>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">よろしければ、下にグループ名を入力してください。</p>
-      <div class="field"><input type="text" id="g-del-confirm" placeholder="ここにグループ名を入力"></div>
-      <div class="modal-actions">
-        <button class="btn ghost" id="g-del-cancel">キャンセル</button>
-        <button class="btn danger" id="g-del-ok" disabled style="opacity:.4;">削除する</button>
-      </div>
-    `);
-    const input = document.getElementById('g-del-confirm');
-    const okBtn = document.getElementById('g-del-ok');
-    input.addEventListener('input', ()=>{
-      const ok = input.value.trim() === gname;
-      okBtn.disabled = !ok; okBtn.style.opacity = ok ? '1' : '.4';
-    });
-    document.getElementById('g-del-cancel').addEventListener('click', openGroupPicker);
-    okBtn.addEventListener('click', async ()=>{
-      if(input.value.trim() !== gname) return;
-      if(gid === currentGid) detachGroupListeners();
-      await gRef(gid).remove().catch(e=>console.error(e));
-      await metaRef().child(gid).remove().catch(e=>console.error(e));
-      delete favH[gid]; delete favR[gid]; saveFavH(); saveFavR();
-      closeModal();
-      if(gid === currentGid){
-        const remaining = Object.keys(groupsMeta).filter(g=>g!==gid);
-        currentGid = '';
-        if(remaining.length){ await switchGroup(remaining[0]); }
-        else { catalog = emptyCatalog(); events = []; members = {}; saveGid(); renderAll(); }
-      }
-      showToast(`グループ「${gname}」を削除しました`);
-    });
-  }
-
   document.getElementById('group-switch-home').addEventListener('click', openGroupPicker);
   document.getElementById('group-switch-habits').addEventListener('click', openGroupPicker);
   document.getElementById('add-group-btn').addEventListener('click', ()=> openGroupNameModal(null));
 
   // ---------- Actions ----------
+  function myCountToday(habit){
+    const today = todayStr();
+    return events.filter(e => e.type==='habit' && e.itemId===habit.id && e.name===myName && e.date===today).length;
+  }
+
+  // With a daily limit above 1, tapping adds another completion until the limit
+  // is reached; tapping at the limit clears the day so it can be redone.
   async function toggleHabit(habit){
     if(!habit) return;
     if(!myName){ openNameModal(true); return; }
     requireJoin(async ()=>{
       const today = todayStr();
-      const existing = events.find(e => e.type==='habit' && e.itemId===habit.id && e.name===myName && e.date===today);
-      if(existing){
-        await removeEvent(existing.id);
+      const limit = Math.max(1, habit.dailyLimit || 1);
+      const mine = events.filter(e => e.type==='habit' && e.itemId===habit.id && e.name===myName && e.date===today);
+      if(mine.length >= limit){
+        for(const e of mine){ await removeEvent(e.id); }
       } else {
         const { price } = computeHabitPrice(habit);
         await addEvent({ id: uid(), type:'habit', name: myName, itemId: habit.id, itemName: habit.name, amount: price, date: today, ts: Date.now() });
@@ -1154,10 +1479,22 @@
     const favs = favHSet();
 
     const row = (h, i, group, compact) => {
-      const done = !!myName && events.some(e=>e.type==='habit' && e.itemId===h.id && e.name===myName && e.date===today);
+      const limit = Math.max(1, h.dailyLimit || 1);
+      const mineToday = myName ? events.filter(e=>e.type==='habit' && e.itemId===h.id && e.name===myName && e.date===today).length : 0;
+      const done = mineToday > 0;
+      const checkLabel = limit > 1 ? (mineToday > 0 ? `${mineToday}/${limit}` : '') : (done ? '✓' : '');
       const { price, mult } = computeHabitPrice(h);
       const trend = mult >= 1.2 ? '<span class="trend-tag up">品薄</span>' : (mult <= 0.85 ? '<span class="trend-tag down">定番</span>' : '');
-      const meta = h.minutes != null ? `${h.minutes}分 ・ ` : '';
+      const meta = (h.minutes != null ? `${h.minutes}分 ・ ` : '') + (limit > 1 ? `1日${limit}回まで ・ ` : '');
+      if(selectMode){
+        return `<div class="habit-card">
+          <div class="pick-box ${picked.has(h.id)?'on':''}" data-pick-item="${h.id}">${picked.has(h.id)?'✓':''}</div>
+          <div class="habit-info" data-pick-item="${h.id}">
+            <div class="hname">${escapeHtml(h.name)}</div>
+            <div class="hmeta">${meta}<span class="price-tag">¥${yen(price)}</span></div>
+          </div>
+        </div>`;
+      }
       const star = `<button class="fav-btn ${favs.has(h.id)?'on':''}" data-fav="${h.id}">★</button>`;
       const controls = compact ? star : `<div class="item-controls">${star}
              <button class="order-btn" data-up="${h.id}" ${i===0?'disabled':''}>▲</button>
@@ -1168,7 +1505,7 @@
           <div class="hname">${escapeHtml(h.name)}</div>
           <div class="hmeta">${meta}<span class="price-tag">¥${yen(price)}</span>${trend}</div>
         </div>
-        <button class="check-btn ${done?'done':''}" data-check="${h.id}">${done?'✓':''}</button>
+        <button class="check-btn ${done?'done':''} ${limit>1?'multi':''}" data-check="${h.id}">${checkLabel}</button>
       </div>`;
     };
 
@@ -1186,6 +1523,9 @@
     });
     el.innerHTML = html;
 
+    el.querySelectorAll('[data-pick-item]').forEach(x=>{
+      x.addEventListener('click', ()=> togglePick(x.dataset.pickItem));
+    });
     el.querySelectorAll('[data-check]').forEach(btn=>{
       btn.addEventListener('click', ()=> toggleHabit(catalog.habits.find(h=>h.id===btn.dataset.check)));
     });
@@ -1216,6 +1556,12 @@
 
     const row = (r, i, group, compact) => {
       const can = balance >= r.cost;
+      if(selectMode){
+        return `<div class="reward-card">
+          <div class="pick-box ${picked.has(r.id)?'on':''}" data-pick-item="${r.id}">${picked.has(r.id)?'✓':''}</div>
+          <div class="reward-info" data-pick-item="${r.id}"><div class="rname">${escapeHtml(r.name)}</div><div class="rmeta">¥${yen(r.cost)}</div></div>
+        </div>`;
+      }
       const star = `<button class="fav-btn ${favs.has(r.id)?'on':''}" data-fav="${r.id}">★</button>`;
       const controls = compact ? star : `<div class="item-controls">${star}
              <button class="order-btn" data-up="${r.id}" ${i===0?'disabled':''}>▲</button>
@@ -1238,6 +1584,9 @@
     html += all.map((r,i)=>row(r,i,all,false)).join('');
     el.innerHTML = html;
 
+    el.querySelectorAll('[data-pick-item]').forEach(x=>{
+      x.addEventListener('click', ()=> togglePick(x.dataset.pickItem));
+    });
     el.querySelectorAll('[data-redeem]').forEach(btn=>{
       btn.addEventListener('click', ()=> redeemReward(catalog.rewards.find(r=>r.id===btn.dataset.redeem)));
     });
@@ -1252,6 +1601,73 @@
       el.querySelectorAll(`[data-down="${r.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('reward', all, r, 1)));
     });
   }
+
+  // ---------- Daily AI comment ----------
+  function renderAiComment(){
+    const card = document.getElementById('ai-comment-card');
+    const box = document.getElementById('ai-comment-text');
+    if(!card || !AI_ENABLED) { if(card) card.style.display = 'none'; return; }
+    card.style.display = '';
+    if(!aiComment || aiComment.date !== todayStr()){
+      box.textContent = aiComment && aiComment.generating ? '考え中です…' : '今日の一言はまだありません';
+    } else {
+      box.textContent = aiComment.text;
+    }
+  }
+
+  // Builds a short factual digest of today's activity for the prompt — kept to
+  // plain data so the AI has real numbers to reference, not vague impressions.
+  function buildDailyDigest(){
+    const today = todayStr();
+    const names = rosterNames();
+    const todays = events.filter(e => e.date === today);
+    const doneToday = names.map(n => {
+      const items = todays.filter(e => e.name === n && e.type==='habit').map(e=>e.itemName);
+      return `${n}: ${items.length ? items.join('、') : 'まだ何もしていません'}`;
+    }).join('\n');
+
+    const notable = catalog.habits.map(h => {
+      const { price, mult } = computeHabitPrice(h);
+      return { name: h.name, price, mult };
+    }).filter(h => h.mult >= 1.3 || h.mult <= 0.8)
+      .sort((a,b) => Math.abs(b.mult-1) - Math.abs(a.mult-1))
+      .slice(0, 3)
+      .map(h => `${h.name}(現在¥${yen(h.price)}、基準の${h.mult.toFixed(1)}倍)`)
+      .join('、') || '特に目立った変動はありません';
+
+    return `今日の記録:\n${doneToday}\n\n値動きが目立つ習慣: ${notable}`;
+  }
+
+  async function maybeGenerateDailyComment(){
+    if(!AI_ENABLED || !currentGid || aiCommentAttempted) return;
+    if(aiComment && aiComment.date === todayStr()) return;
+    aiCommentAttempted = true;
+
+    // Lock via transaction so only one device among the family actually calls the AI today.
+    const lockRef = gRef(currentGid).child('aiComment');
+    const claimed = await lockRef.transaction(cur => {
+      if(cur && cur.date === todayStr()) return; // someone already has it (or is generating)
+      return { date: todayStr(), generating: true, text: '' };
+    }).catch(()=>({ committed:false }));
+    if(!claimed || !claimed.committed) return;
+
+    const digest = buildDailyDigest();
+    const system = 'あなたは家族の家事・習慣共有アプリのマスコットです。事実だけをもとに、温かく短いコメントを日本語で1〜2文、80文字以内で書いてください。誰かを責めるのではなく、気づきを与える言い方にしてください。絵文字は使わないでください。';
+    const text = await callAI(system, digest, 150);
+
+    await lockRef.set({
+      date: todayStr(),
+      text: text || '今日もお疲れさまでした。習慣の様子はカレンダーからも確認できます。',
+      generatedAt: Date.now()
+    }).catch(e=>console.error('save ai comment failed', e));
+  }
+
+  document.getElementById('ai-comment-refresh').addEventListener('click', async ()=>{
+    if(!currentGid) return;
+    await gRef(currentGid).child('aiComment').remove().catch(e=>console.error(e));
+    aiCommentAttempted = false;
+    maybeGenerateDailyComment();
+  });
 
   function renderHome(){
     renderGroupBars();
@@ -1299,6 +1715,100 @@
   document.getElementById('family-refresh').addEventListener('click', ()=>{
     renderHome();
     showToast(db ? '最新の状態です' : 'オフラインです');
+  });
+
+  // ---------- Calendar ----------
+  let calYear = new Date().getFullYear();
+  let calMonth = new Date().getMonth()+1;
+  let calSelected = todayStr();
+
+  function renderCalendar(){
+    const label = document.getElementById('cal-label');
+    const grid = document.getElementById('calendar-grid');
+    if(!grid) return;
+    label.textContent = `${calYear} / ${calMonth}`;
+
+    const first = new Date(calYear, calMonth-1, 1);
+    const startDow = first.getDay();
+    const dim = new Date(calYear, calMonth, 0).getDate();
+
+    // Count habit completions per day so each cell can show density at a glance.
+    const byDay = {};
+    events.forEach(e=>{
+      if(!String(e.date).startsWith(`${calYear}-${pad(calMonth)}`)) return;
+      const d = parseInt(String(e.date).slice(8,10));
+      if(!byDay[d]) byDay[d] = { habit:0, reward:0 };
+      byDay[d][e.type === 'habit' ? 'habit' : 'reward']++;
+    });
+
+    const dows = ['日','月','火','水','木','金','土'];
+    let html = '<div class="cal-head">' + dows.map((d,i)=>
+      `<div class="${i===0?'sun':(i===6?'sat':'')}">${d}</div>`).join('') + '</div>';
+    html += '<div class="cal-grid">';
+    for(let i=0;i<startDow;i++) html += '<div class="cal-cell empty"></div>';
+    for(let d=1; d<=dim; d++){
+      const ds = dateFromParts(calYear, calMonth, d);
+      const info = byDay[d] || { habit:0, reward:0 };
+      let dots = '';
+      if(info.habit > 0){
+        const lv = info.habit >= 5 ? 'lv3' : (info.habit >= 3 ? 'lv2' : 'lv1');
+        const n = Math.min(info.habit, 3);
+        for(let k=0;k<n;k++) dots += `<i class="dot ${lv}"></i>`;
+      }
+      if(info.reward > 0) dots += '<i class="dot spend"></i>';
+      const cls = ['cal-cell'];
+      if(ds === todayStr()) cls.push('today');
+      if(ds === calSelected) cls.push('sel');
+      html += `<div class="${cls.join(' ')}" data-day="${ds}">
+        <span class="dnum">${d}</span><span class="dots">${dots}</span></div>`;
+    }
+    html += '</div>';
+    grid.innerHTML = html;
+    grid.querySelectorAll('[data-day]').forEach(cell=>{
+      cell.addEventListener('click', ()=>{
+        calSelected = cell.dataset.day;
+        renderCalendar();
+        renderCalDetail();
+      });
+    });
+    renderCalDetail();
+  }
+
+  function renderCalDetail(){
+    const title = document.getElementById('cal-detail-title');
+    const box = document.getElementById('cal-detail');
+    if(!box) return;
+    const [y,m,d] = calSelected.split('-');
+    title.textContent = `${parseInt(m)}月${parseInt(d)}日の記録`;
+    const dayEvents = events.filter(e => e.date === calSelected);
+    if(!dayEvents.length){
+      box.innerHTML = '<div class="empty">この日の記録はありません</div>';
+      return;
+    }
+    // Group by person so you can see who did what.
+    const byPerson = {};
+    dayEvents.forEach(e=>{
+      if(!byPerson[e.name]) byPerson[e.name] = [];
+      byPerson[e.name].push(e);
+    });
+    box.innerHTML = Object.keys(byPerson).sort().map(name=>{
+      const list = byPerson[name].slice().sort((a,b)=>(a.ts||0)-(b.ts||0));
+      const total = list.reduce((s,e)=> s + (e.type==='habit' ? e.amount : -e.amount), 0);
+      const rows = list.map(e=>{
+        const cls = e.type==='habit' ? 'plus' : 'minus';
+        const sign = e.type==='habit' ? '+' : '-';
+        const tag = e.type==='habit' ? '' : '(交換)';
+        return `<div class="list-row"><div><div class="name">${escapeHtml(e.itemName)} ${tag}</div></div><div class="amt ${cls}">${sign}¥${yen(e.amount)}</div></div>`;
+      }).join('');
+      return `<div class="cal-person">${escapeHtml(name)} <span style="font-size:12px; color:var(--ink-soft)">合計 ${total>=0?'+':''}¥${yen(Math.abs(total))}</span></div>${rows}`;
+    }).join('');
+  }
+
+  document.getElementById('cal-prev').addEventListener('click', ()=>{
+    calMonth--; if(calMonth<1){ calMonth=12; calYear--; } renderCalendar();
+  });
+  document.getElementById('cal-next').addEventListener('click', ()=>{
+    calMonth++; if(calMonth>12){ calMonth=1; calYear++; } renderCalendar();
   });
 
   // ---------- Stats ----------
@@ -1423,12 +1933,10 @@
             <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}${isCurrent?' (表示中)':''}</div>
             ${status}
             <button class="gp-edit" data-rename="${gid}">名前</button>
-            <button class="gp-edit" data-del="${gid}">削除</button>
           </div>`;
         }).join('');
         el.querySelectorAll('[data-pick]').forEach(x=> x.addEventListener('click', ()=> switchGroup(x.dataset.pick)));
         el.querySelectorAll('[data-rename]').forEach(x=> x.addEventListener('click', ()=> openGroupNameModal(x.dataset.rename)));
-        el.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', ()=> openGroupDeleteModal(x.dataset.del)));
       }
     }
 
@@ -1448,59 +1956,65 @@
     }
   }
 
+  // Group deletion now goes through the same all-members approval flow that
+  // reset used to, because deleting a group destroys exactly the same data.
   function renderResetStatus(){
     const el = document.getElementById('reset-status');
+    const card = document.getElementById('delete-request-card');
     if(!el) return;
     if(!currentGid){ el.innerHTML = '<div class="empty">グループが選択されていません</div>'; return; }
+    const gname = groupsMeta[currentGid] ? groupsMeta[currentGid].name : '';
     const names = rosterNames();
 
-    if(!resetRequest){
-      el.innerHTML = `<div class="setting-row danger" id="reset-btn"><span class="srow-text">このグループのデータをリセットする</span><span class="arrow">›</span></div>`;
+    if(!deleteRequest){
+      el.innerHTML = `<div class="setting-row danger" id="reset-btn"><span class="srow-text">「${escapeHtml(gname)}」の削除を申請する</span><span class="arrow">›</span></div>`;
       const btn = document.getElementById('reset-btn');
-      if(btn) btn.addEventListener('click', openResetRequestModal);
+      if(btn) btn.addEventListener('click', openDeleteRequestModal);
       return;
     }
-    const approvals = resetRequest.approvals || {};
+    const approvals = deleteRequest.approvals || {};
     const approved = names.filter(n => approvals[encodeKey(n)]).length;
     const iApproved = myName && approvals[encodeKey(myName)];
     el.innerHTML = `
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">${escapeHtml(resetRequest.requestedBy)}さんがリセットを提案しています(${approved}/${names.length}人が承認)</p>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">${escapeHtml(deleteRequest.requestedBy)}さんが「${escapeHtml(gname)}」の削除を申請しています(${approved}/${names.length}人が承認)</p>
       ${names.map(n=>`<div class="list-row"><div class="name">${escapeHtml(n)}</div><div class="amt ${approvals[encodeKey(n)]?'plus':''}">${approvals[encodeKey(n)]?'承認済み':'未承認'}</div></div>`).join('')}
       <div class="modal-actions" style="margin-top:14px;">
-        ${iApproved ? '' : '<button class="btn" id="approve-reset">自分も承認する</button>'}
-        <button class="btn ghost" id="cancel-reset-request">提案を取り消す</button>
+        ${iApproved ? '' : '<button class="btn danger" id="approve-reset">自分も承認する</button>'}
+        <button class="btn ghost" id="cancel-reset-request">申請を取り消す</button>
       </div>`;
     const ap = document.getElementById('approve-reset');
     if(ap) ap.addEventListener('click', async ()=>{
-      await gRef(currentGid).child('resetRequest/approvals/'+encodeKey(myName)).set(true).catch(e=>console.error(e));
+      await gRef(currentGid).child('deleteRequest/approvals/'+encodeKey(myName)).set(true).catch(e=>console.error(e));
     });
     document.getElementById('cancel-reset-request').addEventListener('click', async ()=>{
-      await gRef(currentGid).child('resetRequest').remove().catch(e=>console.error(e));
+      await gRef(currentGid).child('deleteRequest').remove().catch(e=>console.error(e));
     });
   }
 
-  function openResetRequestModal(){
+  function openDeleteRequestModal(){
     if(!myName){ showToast('先に名前を設定してください'); return; }
+    if(!isJoinedToCurrentGroup()){ showToast('参加しているメンバーのみ申請できます'); return; }
+    const gname = groupsMeta[currentGid] ? groupsMeta[currentGid].name : '';
     openModal(`
-      <h3>このグループのデータをリセットしますか?</h3>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">習慣・ごほうび・記録・残高など、このグループの<b>全員分</b>のデータが削除されます。他のグループには影響しません。</p>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">グループの登録メンバー<b>全員の承認</b>がそろうと実行されます。まず下に「リセット」と入力して提案してください。</p>
-      <div class="field"><input type="text" id="r-confirm" placeholder="ここに「リセット」と入力"></div>
+      <h3>「${escapeHtml(gname)}」の削除を申請しますか?</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">承認がそろうと、このグループの習慣・ごほうび・記録・残高が<b>すべて削除</b>されます。他のグループには影響しません。</p>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">登録メンバー<b>全員の承認</b>が必要です。まず下にグループ名を入力して申請してください。</p>
+      <div class="field"><input type="text" id="r-confirm" placeholder="ここにグループ名を入力"></div>
       <div class="modal-actions">
         <button class="btn ghost" id="r-cancel">キャンセル</button>
-        <button class="btn danger" id="r-ok" disabled style="opacity:.4;">リセットを提案する</button>
+        <button class="btn danger" id="r-ok" disabled style="opacity:.4;">削除を申請する</button>
       </div>
     `);
     const input = document.getElementById('r-confirm');
     const okBtn = document.getElementById('r-ok');
     input.addEventListener('input', ()=>{
-      const ok = input.value.trim() === 'リセット';
+      const ok = input.value.trim() === gname;
       okBtn.disabled = !ok; okBtn.style.opacity = ok ? '1' : '.4';
     });
     document.getElementById('r-cancel').addEventListener('click', closeModal);
     okBtn.addEventListener('click', async ()=>{
-      if(input.value.trim() !== 'リセット') return;
-      await gRef(currentGid).child('resetRequest').set({
+      if(input.value.trim() !== gname) return;
+      await gRef(currentGid).child('deleteRequest').set({
         requestedBy: myName, requestedAt: Date.now(),
         approvals: { [encodeKey(myName)]: true }
       }).catch(e=>console.error(e));
@@ -1509,19 +2023,25 @@
   }
 
   let finalizing = false;
-  async function maybeFinalizeReset(){
-    if(!resetRequest || finalizing || !currentGid) return;
+  async function maybeFinalizeDelete(){
+    if(!deleteRequest || finalizing || !currentGid) return;
     const names = rosterNames();
-    const approvals = resetRequest.approvals || {};
+    const approvals = deleteRequest.approvals || {};
     if(!names.length || !names.every(n => approvals[encodeKey(n)])) return;
     finalizing = true;
+    const gid = currentGid;
+    const gname = groupsMeta[gid] ? groupsMeta[gid].name : '';
     try{
-      await gRef(currentGid).child('catalog').set({ habits: [], rewards: [], goalYear:'', goalMonth:'', seeded:false });
-      await gRef(currentGid).child('events').remove();
-      await gRef(currentGid).child('resetRequest').remove();
-      seedGuard = {};
-      showToast('全員の承認により、このグループをリセットしました');
-    }catch(e){ console.error('reset failed', e); }
+      detachGroupListeners();
+      await gRef(gid).remove();
+      await metaRef().child(gid).remove();
+      delete favH[gid]; delete favR[gid]; saveFavH(); saveFavR();
+      currentGid = '';
+      const remaining = Object.keys(groupsMeta).filter(g => g !== gid);
+      if(remaining.length){ await switchGroup(remaining[0]); }
+      else { catalog = emptyCatalog(); events = []; members = {}; saveGid(); renderAll(); }
+      showToast(`全員の承認により「${gname}」を削除しました`);
+    }catch(e){ console.error('group delete failed', e); }
     finalizing = false;
   }
 
@@ -1530,7 +2050,7 @@
   document.getElementById('goal-month').addEventListener('change', e=>{ catalog.goalMonth = e.target.value; saveGoal('goalMonth', e.target.value); });
 
   // ---------- Tabs ----------
-  const TABS = ['home','habits','stats','settings'];
+  const TABS = ['home','habits','calendar','stats','settings'];
   function showTab(tab){
     activeTab = tab;
     TABS.forEach(t=>{
@@ -1545,11 +2065,80 @@
   document.querySelectorAll('.subtab').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       subTab = btn.dataset.sub;
+      picked.clear();
       document.querySelectorAll('.subtab').forEach(b=>b.classList.toggle('sel', b===btn));
       document.getElementById('habit-list').style.display = subTab==='habit' ? 'block' : 'none';
       document.getElementById('reward-list').style.display = subTab==='reward' ? 'block' : 'none';
+      renderSelectBar(); renderHabits(); renderRewards();
     });
   });
+
+  // ---------- Bulk selection ----------
+  function currentListItems(){
+    return subTab === 'habit' ? catalog.habits : catalog.rewards;
+  }
+  function renderSelectBar(){
+    const toggle = document.getElementById('select-toggle');
+    const all = document.getElementById('select-all');
+    const del = document.getElementById('select-delete');
+    const count = document.getElementById('sel-count');
+    toggle.textContent = selectMode ? '選択をやめる' : 'まとめて選ぶ';
+    all.style.display = selectMode ? '' : 'none';
+    del.style.display = selectMode ? '' : 'none';
+    del.disabled = picked.size === 0;
+    count.textContent = selectMode ? `${picked.size}件を選択中` : '';
+    const total = currentListItems().length;
+    all.textContent = (picked.size === total && total > 0) ? '全解除' : '全選択';
+  }
+  document.getElementById('select-toggle').addEventListener('click', ()=>{
+    selectMode = !selectMode;
+    picked.clear();
+    renderSelectBar(); renderHabits(); renderRewards();
+  });
+  document.getElementById('select-all').addEventListener('click', ()=>{
+    const items = currentListItems();
+    if(picked.size === items.length) picked.clear();
+    else items.forEach(i => picked.add(i.id));
+    renderSelectBar(); renderHabits(); renderRewards();
+  });
+  document.getElementById('select-delete').addEventListener('click', ()=>{
+    if(picked.size === 0) return;
+    const isHabit = subTab === 'habit';
+    const label = isHabit ? '習慣' : 'ごほうび';
+    const names = currentListItems().filter(i => picked.has(i.id)).map(i => i.name);
+    openModal(`
+      <h3>${picked.size}件の${label}を削除しますか?</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">すでに達成/交換した記録と残高はそのまま残ります。</p>
+      <div style="max-height:180px; overflow-y:auto; margin-bottom:6px;">
+        ${names.map(n=>`<div class="list-row"><div class="name">${escapeHtml(n)}</div></div>`).join('')}
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="bd-cancel">キャンセル</button>
+        <button class="btn danger" id="bd-ok">まとめて削除</button>
+      </div>
+    `);
+    document.getElementById('bd-cancel').addEventListener('click', closeModal);
+    document.getElementById('bd-ok').addEventListener('click', async ()=>{
+      if(isHabit){
+        catalog.habits = catalog.habits.filter(h => !picked.has(h.id));
+        await saveHabits();
+      } else {
+        catalog.rewards = catalog.rewards.filter(r => !picked.has(r.id));
+        await saveRewards();
+      }
+      const n = picked.size;
+      picked.clear();
+      selectMode = false;
+      closeModal();
+      renderSelectBar(); renderHabits(); renderRewards();
+      showToast(`${n}件の${label}を削除しました`);
+    });
+  });
+
+  function togglePick(id){
+    if(picked.has(id)) picked.delete(id); else picked.add(id);
+    renderSelectBar(); renderHabits(); renderRewards();
+  }
 
   document.getElementById('fab').addEventListener('click', ()=>{
     if(!currentGid){ showToast('先にグループを作ってください'); return; }
@@ -1558,8 +2147,11 @@
 
   function renderAll(){
     renderHome();
+    renderAiComment();
+    renderSelectBar();
     renderHabits();
     renderRewards();
+    if(activeTab === 'calendar') renderCalendar();
     if(activeTab === 'stats') renderStats();
     if(activeTab === 'settings'){ renderGroupList(); renderFamilyList(); renderResetStatus(); }
   }
