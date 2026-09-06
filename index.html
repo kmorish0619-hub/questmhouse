@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>森下家の習慣帳</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg: #201A14;
+    --bg-alt: #241D16;
+    --paper: #F4E9D2;
+    --paper-alt: #ECDFBE;
+    --ink: #34281E;
+    --ink-soft: #5B4B3B;
+    --mustard: #B8842E;
+    --mustard-deep: #8F6423;
+    --sage: #4B6355;
+    --sage-bright: #6B8873;
+    --brick: #8B4A44;
+    --line: #D9C7A2;
+    --line-dark: #4A3C2C;
+    --cream: #F8F1E1;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0;
+    background:
+      radial-gradient(circle at 15% 8%, rgba(184,132,46,.05), transparent 40%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px),
+      var(--bg);
+    color: var(--cream);
+    font-family: 'Archivo', sans-serif; -webkit-font-smoothing: antialiased; }
+  body{ padding-bottom: 90px; }
+  h1,h2,h3{ font-family: 'Instrument Serif', serif; font-weight: 400; margin: 0; }
+
+  .wrap{ max-width: 640px; margin: 0 auto; padding: 26px 16px 20px; }
+  .topbar{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; }
+  .topbar h1{ font-size: 25px; letter-spacing:.01em; color: var(--cream); }
+  .topbar h1::after{ content:''; display:block; width:38px; height:3px; margin-top:6px;
+    background: var(--mustard); border-radius:2px; }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  /* ---------- Cards (quiet paper, no repeated decoration) ---------- */
+  .card{ background: var(--paper); color: var(--ink);
+    border-radius:3px; padding:19px 20px; margin-bottom:16px; position:relative;
+    box-shadow: 0 2px 0 rgba(0,0,0,.16), 0 8px 16px rgba(0,0,0,.14); }
+  .card h3{ font-size:16px; font-style:italic; font-weight:400; color: var(--ink); margin-bottom:14px; }
+
+  /* the balance is the one place that gets a bold accent */
+  .balance-card{ border-top:3px solid var(--mustard); }
+
+  .goal-field{ margin-bottom:12px; }
+  .goal-field:last-child{ margin-bottom:0; }
+  .goal-field label{ display:block; font-size:11px; color: var(--ink-soft); margin-bottom:5px; letter-spacing:.02em; }
+  .goal-field input{ width:100%; background: var(--paper-alt); border:1px solid var(--line);
+    border-radius:2px; color: var(--ink); padding:9px 10px; font-size:14px; font-family:'Archivo',sans-serif; }
+  .goal-field input:focus{ outline:none; border-color: var(--sage); }
+
+  .balance-card{ text-align:center; }
+  .balance-card .amount{ font-family:'Instrument Serif', serif; font-style:italic; font-weight:400;
+    font-size: 48px; color: var(--mustard-deep); margin: 4px 0 15px; }
+  .balance-sub{ display:flex; justify-content:space-around; border-top:1px dashed var(--line); padding-top:13px; }
+  .balance-sub div{ text-align:center; }
+  .balance-sub .lbl{ font-size:11px; color: var(--ink-soft); margin-bottom:4px; }
+  .balance-sub .val{ font-size:15px; font-weight:600; }
+  .balance-sub .earn{ color: var(--sage); }
+  .balance-sub .spend{ color: var(--brick); }
+
+  .quad{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .quad-item{ background: var(--paper-alt); border:1px solid var(--line); border-radius:2px; padding:10px; text-align:center; }
+  .quad-item .lbl{ font-size:11px; color: var(--ink-soft); margin-bottom:4px; }
+  .quad-item .val{ font-family:'Instrument Serif', serif; font-style:italic; font-weight:400; font-size:20px; color: var(--sage); }
+
+  .list-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+  .list-row:last-child{ border-bottom:none; }
+  .list-row .name{ color: var(--ink); }
+  .list-row .meta{ color: var(--ink-soft); font-size:11px; }
+  .list-row .amt{ font-weight:600; white-space:nowrap; }
+  .amt.plus{ color: var(--sage); }
+  .amt.minus{ color: var(--brick); }
+  .empty{ color: var(--ink-soft); font-size:13px; text-align:center; padding: 20px 0; font-style:italic; }
+
+  .subtabs{ display:flex; background: var(--bg-alt); border-radius: 3px; padding:4px; margin-bottom:18px; border:1px solid var(--line-dark); }
+  .subtab{ flex:1; text-align:center; padding:10px 0; border-radius:2px; font-size:14px; color: var(--cream); opacity:.55;
+    cursor:pointer; font-family:'Archivo',sans-serif; font-weight:500; background:none; border:none; }
+  .subtab.sel{ background: var(--mustard); color:#201A14; opacity:1; font-weight:600; }
+
+  .cat-label{ font-family:'Instrument Serif', serif; font-size:15px; color: var(--cream); margin: 22px 0 10px; position:relative; padding-bottom:6px; }
+  .cat-label:first-child{ margin-top:0; }
+  .cat-label::after{ content:''; position:absolute; left:0; bottom:0; width:46px; height:2px;
+    background: var(--mustard); border-radius:2px; }
+
+  .habit-card, .reward-card{ display:flex; align-items:center; gap:12px;
+    background: var(--paper); color: var(--ink); border-radius:3px; padding:14px 16px; margin-bottom:9px;
+    box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+  .habit-info, .reward-info{ flex:1; min-width:0; }
+  .habit-info .hname, .reward-info .rname{ font-family:'Instrument Serif', serif; font-size:16px; margin-bottom:4px; color: var(--ink); }
+  .habit-info .hmeta{ font-size:12px; color: var(--ink-soft); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .price-tag{ color: var(--mustard-deep); font-style:italic; font-weight:400; font-family:'Instrument Serif', serif; font-size:16px; }
+  .trend-tag{ font-size:10px; padding:2px 7px; border-radius:10px; font-family:'Archivo',sans-serif; }
+  .trend-tag.up{ background: rgba(139,74,68,.14); color: var(--brick); }
+  .trend-tag.down{ background: rgba(75,99,85,.14); color: var(--sage); }
+  .reward-info .rmeta{ font-size:12px; color: var(--mustard-deep); font-weight:600; }
+
+  .check-btn{ width:36px; height:36px; border-radius:50%; border:2px solid var(--sage); background: var(--paper-alt);
+    display:flex; align-items:center; justify-content:center; color: var(--sage); font-size:15px; flex-shrink:0; cursor:pointer;
+    font-family:'Instrument Serif', serif; transform: rotate(-8deg); transition: all .15s; }
+  .check-btn.done{ background: var(--sage); color: var(--cream); border-color: var(--sage); transform: rotate(-8deg) scale(1.05); }
+
+  .redeem-btn{ flex-shrink:0; background: var(--mustard); color:#201A14; border:none; border-radius:2px;
+    padding: 10px 15px; font-size:13px; font-weight:700; cursor:pointer; font-family:'Archivo',sans-serif; }
+  .redeem-btn:disabled{ background: var(--paper-alt); color: var(--ink-soft); cursor:not-allowed; border:1px solid var(--line); }
+
+  .fab{ position: fixed; right: 20px; bottom: 96px; width:54px; height:54px; border-radius:50%;
+    background: var(--mustard); color:#201A14; border:2px solid var(--cream); font-size:26px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.45); font-family:'Instrument Serif', serif; cursor:pointer; z-index:20; }
+
+  .stat-nav{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .stat-nav button{ background: var(--paper-alt); border:1px solid var(--line); color: var(--ink); border-radius:2px;
+    width:30px; height:30px; font-size:14px; cursor:pointer; }
+  .stat-nav .label{ font-family:'Instrument Serif', serif; font-size:16px; color: var(--ink); }
+
+  .btn{ width:100%; background: var(--sage); color: var(--cream); border:none; border-radius:2px;
+    font-family:'Archivo', sans-serif; font-size:15px; font-weight:600; padding:13px; cursor:pointer; letter-spacing:.02em; }
+  .btn.danger{ background: var(--brick); }
+  .btn.ghost{ background:none; border:1px solid var(--line-dark); color: var(--cream); font-family:'Archivo',sans-serif; font-weight:500; font-size:14px; }
+
+  .setting-row{ display:flex; align-items:center; justify-content:space-between; padding:15px 4px;
+    border-bottom:1px dashed var(--line); cursor:pointer; }
+  .setting-row:last-child{ border-bottom:none; }
+  .setting-row .srow-text{ font-size:14px; color: var(--ink); }
+  .setting-row.danger .srow-text{ color: var(--brick); }
+  .setting-row .arrow{ color: var(--ink-soft); }
+  .setting-note{ font-size:12px; color: var(--ink-soft); line-height:1.6; margin-top:8px; }
+
+  .tabbar{ position: fixed; bottom:0; left:0; right:0; background: var(--bg-alt);
+    border-top:1px solid var(--line-dark); display:flex; z-index:10; }
+  .tabbtn{ flex:1; background:none; border:none; color: var(--cream); opacity:.5; padding:10px 0 11px;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; cursor:pointer;
+    font-family:'Archivo',sans-serif; }
+  .tabbtn .ico{ font-size:19px; }
+  .tabbtn.sel{ opacity:1; color: var(--mustard); }
+
+  .modal-overlay{ position: fixed; inset:0; background: rgba(20,15,10,.7); z-index:30;
+    display:flex; align-items:flex-end; justify-content:center; }
+  .modal-overlay.hidden{ display:none; }
+  .modal{ background: var(--paper); color: var(--ink); border-radius: 14px 14px 0 0;
+    width:100%; max-width:640px; padding: 24px 20px 28px; max-height:85vh; overflow-y:auto;
+    border-top:4px solid var(--mustard); }
+  .modal h3{ font-size:18px; color: var(--ink); margin-bottom:16px; }
+  .field{ margin-bottom:13px; }
+  .field label{ display:block; font-size:12px; color: var(--ink-soft); margin-bottom:5px; }
+  .field input, .field select{ width:100%; background: var(--paper-alt); border:1px solid var(--line); border-radius:2px;
+    color: var(--ink); padding:10px; font-size:15px; font-family:'Archivo',sans-serif; }
+  .field input:focus, .field select:focus{ outline:none; border-color: var(--sage); }
+  .modal-actions{ display:flex; gap:8px; margin-top:16px; }
+  .modal-actions .btn{ flex:1; }
+
+  .fam-person{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); }
+  .fam-person:last-child{ border-bottom:none; }
+  .fam-avatar{ width:28px; height:28px; border-radius:50%; background: var(--sage); color: var(--cream);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0;
+    font-family:'Instrument Serif', serif; }
+  .fam-person .fname{ flex:1; font-size:13px; color: var(--ink); }
+  .fam-person .fval{ font-size:15px; font-weight:400; font-style:italic; color: var(--mustard-deep); font-family:'Instrument Serif', serif; }
+  .fam-feed-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+  .fam-feed-row:last-child{ border-bottom:none; }
+  .fam-feed-row .fam-avatar{ width:24px; height:24px; font-size:11px; }
+  .fam-feed-row .ftext{ flex:1; color: var(--ink); }
+  .fam-feed-row .ftime{ color: var(--ink-soft); font-size:11px; white-space:nowrap; }
+
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:100px; background: var(--paper);
+    border:1px solid var(--line); padding:9px 16px; border-radius:20px; font-size:12px; color: var(--ink);
+    z-index:40; opacity:0; pointer-events:none; transition: opacity .3s; max-width:85%; text-align:center; }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ HOME ============ -->
+  <div class="panel active" id="panel-home">
+    <div class="topbar"><h1>ホーム</h1></div>
+
+    <div class="card">
+      <h3>家族の目標</h3>
+      <div class="goal-field">
+        <label>今年の目標</label>
+        <input type="text" id="goal-year" placeholder="今年の目標はどうしますか?">
+      </div>
+      <div class="goal-field">
+        <label>今月の目標</label>
+        <input type="text" id="goal-month" placeholder="今月の目標はどうしますか?">
+      </div>
+    </div>
+
+    <div class="card balance-card">
+      <h3 style="text-align:left">自分の残金</h3>
+      <div class="amount">¥<span id="balance-amt">0</span></div>
+      <div class="balance-sub">
+        <div><div class="lbl">今まで貯めた金額</div><div class="val earn">¥<span id="total-earned">0</span></div></div>
+        <div><div class="lbl">今まで使った金額</div><div class="val spend">¥<span id="total-spent">0</span></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="quad">
+        <div class="quad-item"><div class="lbl">今日</div><div class="val" id="q-today">¥0</div></div>
+        <div class="quad-item"><div class="lbl">昨日</div><div class="val" id="q-yesterday">¥0</div></div>
+        <div class="quad-item"><div class="lbl">今月</div><div class="val" id="q-month">¥0</div></div>
+        <div class="quad-item"><div class="lbl">先月</div><div class="val" id="q-lastmonth">¥0</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>家族の残高</h3>
+      <div id="family-balances"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0">今日のみんな</h3><button class="redeem-btn" id="family-refresh" style="padding:6px 12px; font-size:11px;">更新</button>
+      </div>
+      <div id="family-today"></div>
+    </div>
+
+    <div class="card">
+      <h3>家族の最近の記録</h3>
+      <div id="family-feed"></div>
+    </div>
+  </div>
+
+  <!-- ============ HABITS / REWARDS ============ -->
+  <div class="panel" id="panel-habits">
+    <div class="topbar"><h1>達成する</h1></div>
+    <div class="subtabs">
+      <button class="subtab sel" data-sub="habit">習慣</button>
+      <button class="subtab" data-sub="reward">ごほうび</button>
+    </div>
+    <div id="habit-list"></div>
+    <div id="reward-list" style="display:none"></div>
+  </div>
+
+  <!-- ============ STATS ============ -->
+  <div class="panel" id="panel-stats">
+    <div class="topbar"><h1>達成状況</h1></div>
+    <p class="setting-note" style="margin-bottom:14px;">あなた自身の記録の推移です</p>
+
+    <div class="card">
+      <div class="stat-nav">
+        <button id="year-prev">‹</button>
+        <span class="label" id="year-label">2026</span>
+        <button id="year-next">›</button>
+      </div>
+      <div id="year-chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="stat-nav">
+        <button id="month-prev">‹</button>
+        <span class="label" id="month-label">2026 / 9</span>
+        <button id="month-next">›</button>
+      </div>
+      <div id="month-chart"></div>
+    </div>
+
+    <div class="card">
+      <h3>習慣ごとの達成回数</h3>
+      <div id="habit-totals"></div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="panel" id="panel-settings">
+    <div class="topbar"><h1>設定</h1></div>
+    <div class="card">
+      <div class="setting-row" id="name-btn">
+        <span class="srow-text">名前: <span id="name-current">-</span></span>
+        <span class="arrow">›</span>
+      </div>
+      <div class="setting-row danger" id="reset-btn">
+        <span class="srow-text">家族の共有データをリセットする</span>
+        <span class="arrow">›</span>
+      </div>
+      <div class="setting-note">習慣・ごほうび・記録・残高は家族で共有されています。リセットすると家族全員分のデータが削除されます。</div>
+    </div>
+  </div>
+
+</div>
+
+<button class="fab" id="fab" style="display:none">+</button>
+
+<nav class="tabbar">
+  <button class="tabbtn sel" data-tab="home"><span class="ico">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5"/><path d="M5 8.5V17h10V8.5"/><path d="M8 17v-5h4v5"/></svg>
+  </span>ホーム</button>
+  <button class="tabbtn" data-tab="habits"><span class="ico">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h8l2 2v12H5V3Z"/><path d="M8 8h5M8 11h5M8 14h3"/></svg>
+  </span>達成する</button>
+  <button class="tabbtn" data-tab="stats"><span class="ico">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5V10M10 16.5V4.5M16 16.5v-8"/><path d="M3 17.5h14"/></svg>
+  </span>達成状況</button>
+  <button class="tabbtn" data-tab="settings"><span class="ico">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.6"/><path d="M10 3.5v2M10 14.5v2M16.5 10h-2M5.5 10h-2M14.8 5.2l-1.4 1.4M6.6 13.4l-1.4 1.4M14.8 14.8l-1.4-1.4M6.6 6.6 5.2 5.2"/></svg>
+  </span>設定</button>
+</nav>
+
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal" id="modal-body"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+(function(){
+  // ============================================================
+  // Firebaseの設定をここに貼り付けてください(Firebaseコンソールの
+  // 「プロジェクトの設定」→「マイアプリ」→ SDK の設定と構成 に表示されます)
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyBMsikV1C-Uew7mXrytTKhmYo_Waq51Z04",
+    authDomain: "morishita-quest.firebaseapp.com",
+    databaseURL: "https://morishita-quest-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "morishita-quest",
+    storageBucket: "morishita-quest.firebasestorage.app",
+    messagingSenderId: "1095805337619",
+    appId: "1:1095805337619:web:00e530aeeced6aec633fe6"
+  };
+  const FIREBASE_NOT_CONFIGURED = firebaseConfig.apiKey === "YOUR_API_KEY";
+
+  let db = null;
+  let catalogRef = null;
+  let eventsRef = null;
+  if(!FIREBASE_NOT_CONFIGURED){
+    try{
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      catalogRef = db.ref('catalog');
+      eventsRef = db.ref('events');
+    }catch(e){ console.error('Firebase init failed', e); }
+  }
+
+  const PERSONAL_NAME_KEY = 'koki-quest-myname';
+  const WINDOW_DAYS = 7;
+  const CATEGORIES = [
+    { key:'diet', label:'ダイエット' },
+    { key:'health', label:'健康' },
+    { key:'chore', label:'家事' },
+    { key:'other', label:'その他' }
+  ];
+
+  let myName = '';
+  let catalog = { habits: [], rewards: [], goalYear: '', goalMonth: '' };
+  let events = [];
+  let activeTab = 'home';
+
+  const uid = () => Math.random().toString(36).slice(2,9);
+  const pad = n => String(n).padStart(2,'0');
+  const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const dateFromParts = (y,m,d) => `${y}-${pad(m)}-${pad(d)}`;
+  const yen = n => Math.round(n||0).toLocaleString('ja-JP');
+  const fmtShort = s => { const [y,m,d]=s.split('-'); return `${m}/${d}`; };
+  const escapeHtml = s => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(()=>t.classList.remove('show'), 2600);
+  }
+
+  // ---------- Personal (this device only): stays in the browser, survives HTML updates ----------
+  function loadPersonalName(){
+    try{ myName = localStorage.getItem(PERSONAL_NAME_KEY) || ''; }catch(e){ myName = ''; }
+  }
+  function savePersonalName(){
+    try{ localStorage.setItem(PERSONAL_NAME_KEY, myName); }catch(e){}
+  }
+
+  // ---------- Shared family data: lives in Firebase, independent of this HTML file ----------
+  function saveCatalog(){
+    if(!catalogRef){ showToast('Firebaseが未設定です。コード内のfirebaseConfigを設定してください'); return Promise.resolve(); }
+    return catalogRef.set(catalog).catch(e=>{ console.error('catalog save failed', e); showToast('保存できませんでした。通信状況をご確認ください'); });
+  }
+  function addEvent(event){
+    events.push(event); // optimistic local update; the listener below will reconcile with the server copy
+    if(!eventsRef){ showToast('Firebaseが未設定です。コード内のfirebaseConfigを設定してください'); return Promise.resolve(); }
+    return eventsRef.child(event.id).set(event).catch(e=>{ console.error('event save failed', e); showToast('保存できませんでした。通信状況をご確認ください'); });
+  }
+  function removeEvent(id){
+    events = events.filter(e=>e.id !== id);
+    if(!eventsRef){ return Promise.resolve(); }
+    return eventsRef.child(id).remove().catch(e=>{ console.error('event remove failed', e); showToast('保存できませんでした。通信状況をご確認ください'); });
+  }
+
+  function rerenderCurrent(){
+    renderHome();
+    renderHabits();
+    renderRewards();
+    if(activeTab === 'stats') renderStats();
+  }
+
+  if(catalogRef){
+    catalogRef.on('value', snap=>{
+      const val = snap.val();
+      if(val) catalog = Object.assign({ habits: [], rewards: [], goalYear: '', goalMonth: '' }, val);
+      rerenderCurrent();
+    }, e=>console.error('catalog listener error', e));
+  }
+  if(eventsRef){
+    eventsRef.on('value', snap=>{
+      const val = snap.val();
+      events = val ? Object.values(val) : [];
+      rerenderCurrent();
+    }, e=>console.error('events listener error', e));
+  }
+
+  // ---------- Dynamic pricing ----------
+  function recentDateSet(){
+    const days = [];
+    for(let i=0;i<WINDOW_DAYS;i++){ const d=new Date(); d.setDate(d.getDate()-i); days.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`); }
+    return days;
+  }
+  function computeHabitPrice(habit){
+    const base = habit.basePrice;
+    if(habit.createdAt && (Date.now() - habit.createdAt) < 24*3600*1000) return { price: base, mult: 1 };
+    const days = recentDateSet();
+    const recent = events.filter(e => e.type==='habit' && e.itemId===habit.id && days.includes(e.date));
+    const activeDays = new Set(recent.map(e=>e.date)).size;
+    const perPerson = {};
+    recent.forEach(e=>{ perPerson[e.name] = (perPerson[e.name]||0)+1; });
+    const uniquePeople = Object.keys(perPerson).length;
+
+    const neglectAdj = (1 - activeDays / WINDOW_DAYS) * 0.5;
+    let burdenAdj = 0;
+    if(activeDays >= 4){
+      if(uniquePeople === 1) burdenAdj = 0.3 * (activeDays / WINDOW_DAYS);
+      else if(uniquePeople >= 2) burdenAdj = -0.25 * (activeDays / WINDOW_DAYS);
+    }
+    let mult = 1 + neglectAdj + burdenAdj;
+    mult = Math.max(0.5, Math.min(2.0, mult));
+    const price = Math.max(10, Math.round(base * mult / 10) * 10);
+    return { price, mult };
+  }
+
+  // ---------- Balances (derived from events) ----------
+  function balanceFor(name){
+    let balance=0, earned=0, spent=0;
+    events.forEach(e=>{
+      if(e.name !== name) return;
+      if(e.type==='habit'){ balance += e.amount; earned += e.amount; }
+      else { balance -= e.amount; spent += e.amount; }
+    });
+    return { balance, earned, spent };
+  }
+  function allFamilyNames(){
+    const set = new Set(events.map(e=>e.name));
+    if(myName) set.add(myName);
+    return Array.from(set);
+  }
+
+  // ---------- Tab navigation ----------
+  const tabs = ['home','habits','stats','settings'];
+  function showTab(tab){
+    activeTab = tab;
+    tabs.forEach(t=>{
+      document.getElementById('panel-'+t).classList.toggle('active', t===tab);
+      document.querySelector(`.tabbtn[data-tab="${t}"]`).classList.toggle('sel', t===tab);
+    });
+    document.getElementById('fab').style.display = (tab==='habits') ? 'block' : 'none';
+    if(tab==='home') renderHome();
+    if(tab==='habits') renderHabits(), renderRewards();
+    if(tab==='stats') renderStats();
+  }
+  document.querySelectorAll('.tabbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> showTab(btn.dataset.tab));
+  });
+
+  // ---------- Sub tabs ----------
+  let subTab = 'habit';
+  document.querySelectorAll('.subtab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      subTab = btn.dataset.sub;
+      document.querySelectorAll('.subtab').forEach(b=>b.classList.toggle('sel', b===btn));
+      document.getElementById('habit-list').style.display = subTab==='habit' ? 'block' : 'none';
+      document.getElementById('reward-list').style.display = subTab==='reward' ? 'block' : 'none';
+    });
+  });
+
+  // ---------- Goals (shared) ----------
+  document.getElementById('goal-year').addEventListener('change', async e=>{ catalog.goalYear = e.target.value; await saveCatalog(); });
+  document.getElementById('goal-month').addEventListener('change', async e=>{ catalog.goalMonth = e.target.value; await saveCatalog(); });
+
+  // ---------- Modal helpers ----------
+  const overlay = document.getElementById('modal-overlay');
+  const modalBody = document.getElementById('modal-body');
+  function openModal(html){ modalBody.innerHTML = html; overlay.classList.remove('hidden'); }
+  function closeModal(){ overlay.classList.add('hidden'); modalBody.innerHTML=''; }
+  overlay.addEventListener('click', e=>{ if(e.target === overlay) closeModal(); });
+
+  function openNameModal(first){
+    openModal(`
+      <h3>${first ? 'お名前を教えてください' : '名前を変更'}</h3>
+      <p style="font-size:13px; color:var(--muted); margin:0 0 14px;">家族に表示される名前です。</p>
+      <div class="field"><input type="text" id="m-myname" value="${myName||''}" placeholder="例: 航希"></div>
+      <div class="modal-actions"><button class="btn" id="m-name-save">保存</button></div>
+    `);
+    document.getElementById('m-name-save').addEventListener('click', async ()=>{
+      const v = document.getElementById('m-myname').value.trim();
+      if(!v) return;
+      myName = v;
+      await savePersonalName();
+      document.getElementById('name-current').textContent = myName;
+      closeModal();
+      renderHome();
+    });
+  }
+
+  function openHabitModal(existing){
+    const isEdit = !!existing;
+    openModal(`
+      <h3>${isEdit ? '習慣を編集' : '習慣を追加'}</h3>
+      <div class="field"><label>習慣の名前</label><input type="text" id="m-name" value="${isEdit?existing.name:''}" placeholder="例: 皿洗い"></div>
+      <div class="field"><label>カテゴリ</label>
+        <select id="m-cat">
+          ${CATEGORIES.map(c=>`<option value="${c.key}" ${isEdit&&existing.category===c.key?'selected':''}>${c.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>時間(分・任意)</label><input type="number" id="m-min" value="${isEdit&&existing.minutes!=null?existing.minutes:''}" placeholder="10"></div>
+      <div class="field"><label>基本金額(相場の基準額。実際の金額は需要と供給で変動します)</label><input type="number" id="m-reward" value="${isEdit?existing.basePrice:''}" placeholder="100"></div>
+      <div class="modal-actions">
+        ${isEdit ? '<button class="btn danger" id="m-delete">削除</button>' : ''}
+        <button class="btn" id="m-save">保存</button>
+      </div>
+    `);
+    document.getElementById('m-save').addEventListener('click', async ()=>{
+      const name = document.getElementById('m-name').value.trim();
+      const category = document.getElementById('m-cat').value;
+      const minRaw = document.getElementById('m-min').value;
+      const basePrice = parseInt(document.getElementById('m-reward').value) || 0;
+      if(!name || basePrice<=0) return;
+      if(isEdit){
+        existing.name = name; existing.category = category;
+        existing.minutes = minRaw===''?null:parseFloat(minRaw);
+        existing.basePrice = basePrice;
+      } else {
+        catalog.habits.push({ id: uid(), name, category, minutes: minRaw===''?null:parseFloat(minRaw), basePrice, createdAt: Date.now() });
+      }
+      await saveCatalog(); renderHabits(); closeModal();
+    });
+    if(isEdit){
+      document.getElementById('m-delete').addEventListener('click', async ()=>{
+        catalog.habits = catalog.habits.filter(h=>h.id !== existing.id);
+        await saveCatalog(); renderHabits(); closeModal();
+      });
+    }
+  }
+
+  function openRewardModal(existing){
+    const isEdit = !!existing;
+    openModal(`
+      <h3>${isEdit ? 'ごほうびを編集' : 'ごほうびを追加'}</h3>
+      <div class="field"><label>ごほうびの名前</label><input type="text" id="m-name" value="${isEdit?existing.name:''}" placeholder="例: 好きなお菓子"></div>
+      <div class="field"><label>必要な金額</label><input type="number" id="m-cost" value="${isEdit?existing.cost:''}" placeholder="500"></div>
+      <div class="modal-actions">
+        ${isEdit ? '<button class="btn danger" id="m-delete">削除</button>' : ''}
+        <button class="btn" id="m-save">保存</button>
+      </div>
+    `);
+    document.getElementById('m-save').addEventListener('click', async ()=>{
+      const name = document.getElementById('m-name').value.trim();
+      const cost = parseInt(document.getElementById('m-cost').value) || 0;
+      if(!name || cost<=0) return;
+      if(isEdit){ existing.name = name; existing.cost = cost; }
+      else { catalog.rewards.push({ id: uid(), name, cost, createdAt: Date.now() }); }
+      await saveCatalog(); renderRewards(); closeModal();
+    });
+    if(isEdit){
+      document.getElementById('m-delete').addEventListener('click', async ()=>{
+        catalog.rewards = catalog.rewards.filter(r=>r.id !== existing.id);
+        await saveCatalog(); renderRewards(); closeModal();
+      });
+    }
+  }
+
+  document.getElementById('fab').addEventListener('click', ()=>{
+    if(subTab === 'habit') openHabitModal(null);
+    else openRewardModal(null);
+  });
+
+  // ---------- Actions ----------
+  async function toggleHabit(habit){
+    const today = todayStr();
+    const name = myName || '(名無し)';
+    const existing = events.find(e=> e.type==='habit' && e.itemId===habit.id && e.name===name && e.date===today);
+    if(existing){
+      await removeEvent(existing.id);
+    } else {
+      const { price } = computeHabitPrice(habit);
+      await addEvent({ id: uid(), type:'habit', name, itemId: habit.id, itemName: habit.name, amount: price, date: today, ts: Date.now() });
+    }
+    renderHabits(); renderHome();
+  }
+
+  async function redeemReward(reward){
+    const name = myName || '(名無し)';
+    const { balance } = balanceFor(name);
+    if(balance < reward.cost) return;
+    await addEvent({ id: uid(), type:'reward', name, itemId: reward.id, itemName: reward.name, amount: reward.cost, date: todayStr(), ts: Date.now() });
+    renderRewards(); renderHome();
+  }
+
+  // ---------- Renderers: habits / rewards ----------
+  function renderHabits(){
+    const today = todayStr();
+    const el = document.getElementById('habit-list');
+    if(catalog.habits.length === 0){
+      el.innerHTML = '<div class="empty">右下の + から習慣を追加しよう(ダイエット・健康・家事など)</div>';
+      return;
+    }
+    const name = myName || '(名無し)';
+    let html = '';
+    CATEGORIES.forEach(cat=>{
+      const items = catalog.habits.filter(h => (h.category||'other') === cat.key);
+      if(items.length === 0) return;
+      html += `<div class="cat-label">${cat.label}</div>`;
+      html += items.map(h=>{
+        const done = events.some(e=>e.type==='habit' && e.itemId===h.id && e.name===name && e.date===today);
+        const { price, mult } = computeHabitPrice(h);
+        const trend = mult >= 1.2 ? '<span class="trend-tag up">品薄</span>' : (mult <= 0.85 ? '<span class="trend-tag down">定番</span>' : '');
+        const meta = [h.minutes!=null?`${h.minutes}分`:null].filter(Boolean).join(' ・ ');
+        return `<div class="habit-card">
+          <div class="habit-info" data-edit="${h.id}">
+            <div class="hname">${escapeHtml(h.name)}</div>
+            <div class="hmeta">${meta?meta+' ・ ':''}<span class="price-tag">¥${yen(price)}</span>${trend}</div>
+          </div>
+          <button class="check-btn ${done?'done':''}" data-check="${h.id}">${done?'✓':''}</button>
+        </div>`;
+      }).join('');
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('[data-check]').forEach(btn=>{
+      btn.addEventListener('click', ()=> toggleHabit(catalog.habits.find(h=>h.id===btn.dataset.check)));
+    });
+    el.querySelectorAll('[data-edit]').forEach(row=>{
+      row.addEventListener('click', ()=> openHabitModal(catalog.habits.find(h=>h.id===row.dataset.edit)));
+    });
+  }
+
+  function renderRewards(){
+    const el = document.getElementById('reward-list');
+    if(catalog.rewards.length === 0){
+      el.innerHTML = '<div class="empty">右下の + からごほうびを追加しよう</div>';
+      return;
+    }
+    const name = myName || '(名無し)';
+    const { balance } = balanceFor(name);
+    el.innerHTML = catalog.rewards.map(r=>{
+      const can = balance >= r.cost;
+      return `<div class="reward-card">
+        <div class="reward-info" data-edit="${r.id}"><div class="rname">${escapeHtml(r.name)}</div><div class="rmeta">¥${yen(r.cost)}</div></div>
+        <button class="redeem-btn" data-redeem="${r.id}" ${can?'':'disabled'}>交換する</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-redeem]').forEach(btn=>{
+      btn.addEventListener('click', ()=> redeemReward(catalog.rewards.find(r=>r.id===btn.dataset.redeem)));
+    });
+    el.querySelectorAll('[data-edit]').forEach(row=>{
+      row.addEventListener('click', ()=> openRewardModal(catalog.rewards.find(r=>r.id===row.dataset.edit)));
+    });
+  }
+
+  // ---------- Home ----------
+  function sumByDateForMe(date, name){
+    return events.filter(e=>e.name===name && e.type==='habit' && e.date===date).reduce((s,e)=>s+e.amount,0);
+  }
+  function sumByMonthForMe(y,m,name){
+    const prefix = `${y}-${pad(m)}`;
+    return events.filter(e=>e.name===name && e.type==='habit' && e.date.startsWith(prefix)).reduce((s,e)=>s+e.amount,0);
+  }
+
+  function initials(name){ return (name||'?').slice(0,1); }
+  function relTime(ts){
+    const diffMin = Math.floor((Date.now()-ts)/60000);
+    if(diffMin < 1) return 'たった今';
+    if(diffMin < 60) return `${diffMin}分前`;
+    const diffH = Math.floor(diffMin/60);
+    if(diffH < 24) return `${diffH}時間前`;
+    return fmtShort(new Date(ts).toISOString().slice(0,10));
+  }
+
+  function renderHome(){
+    document.getElementById('name-current').textContent = myName || '未設定';
+    document.getElementById('goal-year').value = catalog.goalYear || '';
+    document.getElementById('goal-month').value = catalog.goalMonth || '';
+
+    const name = myName || '(名無し)';
+    const { balance, earned, spent } = balanceFor(name);
+    document.getElementById('balance-amt').textContent = yen(balance);
+    document.getElementById('total-earned').textContent = yen(earned);
+    document.getElementById('total-spent').textContent = yen(spent);
+
+    const now = new Date();
+    const today = todayStr();
+    const yest = new Date(now); yest.setDate(now.getDate()-1);
+    const yestStr = `${yest.getFullYear()}-${pad(yest.getMonth()+1)}-${pad(yest.getDate())}`;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+
+    document.getElementById('q-today').textContent = '¥'+yen(sumByDateForMe(today, name));
+    document.getElementById('q-yesterday').textContent = '¥'+yen(sumByDateForMe(yestStr, name));
+    document.getElementById('q-month').textContent = '¥'+yen(sumByMonthForMe(now.getFullYear(), now.getMonth()+1, name));
+    document.getElementById('q-lastmonth').textContent = '¥'+yen(sumByMonthForMe(lastMonthDate.getFullYear(), lastMonthDate.getMonth()+1, name));
+
+    // family balances
+    const names = allFamilyNames();
+    const fb = document.getElementById('family-balances');
+    if(names.length === 0){
+      fb.innerHTML = '<div class="empty">まだ記録がありません</div>';
+    } else {
+      const rows = names.map(n=>({ n, b: balanceFor(n).balance })).sort((a,b)=>b.b-a.b);
+      fb.innerHTML = rows.map(r=>`<div class="fam-person"><div class="fam-avatar">${escapeHtml(initials(r.n))}</div><div class="fname">${escapeHtml(r.n)}</div><div class="fval">¥${yen(r.b)}</div></div>`).join('');
+    }
+
+    // today per-person achievement counts
+    const todayCounts = {};
+    events.filter(e=>e.type==='habit' && e.date===today).forEach(e=>{ todayCounts[e.name] = (todayCounts[e.name]||0)+1; });
+    const tNames = Object.keys(todayCounts).sort((a,b)=>todayCounts[b]-todayCounts[a]);
+    const ft = document.getElementById('family-today');
+    ft.innerHTML = tNames.length===0 ? '<div class="empty">今日はまだ誰も記録していません</div>' :
+      tNames.map(n=>`<div class="fam-person"><div class="fam-avatar">${escapeHtml(initials(n))}</div><div class="fname">${escapeHtml(n)}</div><div class="fval">${todayCounts[n]}件</div></div>`).join('');
+
+    // recent combined feed
+    const recent = events.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,10);
+    const ff = document.getElementById('family-feed');
+    ff.innerHTML = recent.length===0 ? '<div class="empty">まだ記録がありません</div>' :
+      recent.map(e=>{
+        const amtCls = e.type==='habit' ? 'plus' : 'minus';
+        const sign = e.type==='habit' ? '+' : '-';
+        const verb = e.type==='habit' ? 'を達成' : 'と交換';
+        return `<div class="fam-feed-row"><div class="fam-avatar">${escapeHtml(initials(e.name))}</div><div class="ftext">${escapeHtml(e.name)}さんが「${escapeHtml(e.itemName)}」${verb}<div class="ftime">${relTime(e.ts||Date.now())}</div></div><div class="amt ${amtCls}">${sign}¥${yen(e.amount)}</div></div>`;
+      }).join('');
+  }
+
+  document.getElementById('family-refresh').addEventListener('click', ()=>{
+    // data now syncs live via Firebase; this just re-renders from the current cache
+    renderHome();
+    showToast(FIREBASE_NOT_CONFIGURED ? 'Firebase未設定です' : '最新の状態です');
+  });
+
+  // ---------- Stats (personal) ----------
+  let statYear = new Date().getFullYear();
+  let statMonth = new Date().getMonth()+1;
+
+  function renderStats(){
+    const name = myName || '(名無し)';
+    document.getElementById('year-label').textContent = statYear;
+    document.getElementById('month-label').textContent = `${statYear} / ${statMonth}`;
+
+    const monthTotals = [];
+    for(let m=1;m<=12;m++) monthTotals.push(sumByMonthForMe(statYear, m, name));
+    document.getElementById('year-chart').innerHTML = barChartSVG(
+      monthTotals.map((v,i)=>({label:(i+1)+'月', v})), 'var(--gold-bright)'
+    );
+
+    const daysInMonth = new Date(statYear, statMonth, 0).getDate();
+    const dayTotals = [];
+    for(let d=1; d<=daysInMonth; d++){
+      dayTotals.push(sumByDateForMe(dateFromParts(statYear, statMonth, d), name));
+    }
+    document.getElementById('month-chart').innerHTML = barChartSVG(
+      dayTotals.map((v,i)=>({label:String(i+1), v})), 'var(--teal-bright)', true
+    );
+
+    const counts = {};
+    events.filter(e=>e.name===name && e.type==='habit').forEach(e=>{ counts[e.itemName] = (counts[e.itemName]||0)+1; });
+    const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const ht = document.getElementById('habit-totals');
+    ht.innerHTML = entries.length===0 ? '<div class="empty">まだ達成記録がありません</div>' :
+      entries.map(([n,count])=>`<div class="list-row"><div class="name">${escapeHtml(n)}</div><div class="amt">${count}回</div></div>`).join('');
+  }
+
+  function barChartSVG(data, color, sparse){
+    const W = 580, H = 130, PAD_B = 16, PAD_T = 6;
+    const max = Math.max(1, ...data.map(d=>d.v));
+    const bw = (W / data.length) * 0.6;
+    const gap = (W / data.length);
+    const bars = data.map((d,i)=>{
+      const h = (d.v/max) * (H-PAD_B-PAD_T);
+      const x = i*gap + (gap-bw)/2;
+      const y = H - PAD_B - h;
+      const showLabel = !sparse || data.length<=12 || i%5===0 || i===data.length-1;
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,h).toFixed(1)}" rx="2" fill="${color}" opacity="${d.v>0?1:0.25}"/>
+        ${showLabel?`<text x="${(x+bw/2).toFixed(1)}" y="${H-4}" font-size="9" fill="var(--muted)" text-anchor="middle">${d.label}</text>`:''}`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${bars}</svg>`;
+  }
+
+  document.getElementById('year-prev').addEventListener('click', ()=>{ statYear--; renderStats(); });
+  document.getElementById('year-next').addEventListener('click', ()=>{ statYear++; renderStats(); });
+  document.getElementById('month-prev').addEventListener('click', ()=>{
+    statMonth--; if(statMonth<1){ statMonth=12; statYear--; } renderStats();
+  });
+  document.getElementById('month-next').addEventListener('click', ()=>{
+    statMonth++; if(statMonth>12){ statMonth=1; statYear++; } renderStats();
+  });
+
+  // ---------- Settings ----------
+  document.getElementById('name-btn').addEventListener('click', ()=> openNameModal(false));
+  document.getElementById('reset-btn').addEventListener('click', ()=>{
+    openModal(`
+      <h3>家族の共有データをリセットしますか?</h3>
+      <p style="font-size:13px; color:var(--muted); margin:0 0 16px;">習慣・ごほうび・記録・残高など、家族全員分のデータがすべて削除されます。この操作は取り消せません。</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cancel-reset">キャンセル</button>
+        <button class="btn danger" id="confirm-reset">リセットする</button>
+      </div>
+    `);
+    document.getElementById('cancel-reset').addEventListener('click', closeModal);
+    document.getElementById('confirm-reset').addEventListener('click', async ()=>{
+      catalog = { habits: [], rewards: [], goalYear: '', goalMonth: '' };
+      await saveCatalog();
+      if(eventsRef){ await eventsRef.remove().catch(e=>console.error('events clear failed', e)); }
+      events = [];
+      renderHome(); renderHabits(); renderRewards();
+      closeModal();
+    });
+  });
+
+  // ---------- Init ----------
+  function init(){
+    loadPersonalName();
+    renderHome();
+    renderHabits();
+    renderRewards();
+    if(FIREBASE_NOT_CONFIGURED) showToast('Firebase未設定です。コード内のfirebaseConfigを設定してください');
+    if(!myName) openNameModal(true);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
