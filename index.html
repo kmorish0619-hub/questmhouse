@@ -963,8 +963,12 @@
     const reasons = [];
 
     if(habit.createdAt && (new Date(asOf) - habit.createdAt) < 24*3600*1000){
-      return { price: base, mult: 1, profile: prof,
-               reasons: ['追加から24時間は基本金額のままです'] };
+      // The 24h grace period only holds off the automatic algorithm — an
+      // explicit AI adjustment from family feedback should still count.
+      const adj = (habit.aiAdjust && habit.aiAdjust !== 1) ? habit.aiAdjust : 1;
+      const reasons = ['追加から24時間は基本金額のままです(自動の値動きなし)'];
+      if(adj !== 1) reasons.push(`家族からの意見を受けたAIの判断で ${adj > 1 ? '上乗せ' : '割引'}(${adj.toFixed(2)}倍)`);
+      return { price: Math.max(1, Math.round(base * adj)), mult: adj, profile: prof, reasons };
     }
 
     let mult = 1;
