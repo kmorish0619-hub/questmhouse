@@ -1142,7 +1142,7 @@
       <div class="field"><label>1日に達成できる回数</label><input type="number" id="m-daily" min="1" max="50" value="${isEdit&&existing.dailyLimit?existing.dailyLimit:1}" placeholder="1"></div>
       <div class="field"><label>本来の実施ペース(何日に1回・任意)</label><input type="number" id="m-cadence" min="1" max="60" value="${isEdit&&existing.cadenceDays?existing.cadenceDays:''}" placeholder="毎日なら1、週1なら7(空欄なら自動判定)"></div>
       <div class="field"><label>基本金額(相場の基準額。実際の金額は需要と供給で変動します)</label><input type="number" id="m-reward" value="${isEdit?existing.basePrice:''}" placeholder="100"></div>
-      ${isEdit ? '<div id="m-price-info"></div>' : ''}
+      ${isEdit ? '<div id="m-undo-bar"></div><div id="m-price-info"></div>' : ''}
       ${isEdit && AI_ENABLED ? `
       <div class="field" style="border-top:1px dashed var(--line); padding-top:14px; margin-top:4px;">
         <label>AIへの一言(金額・名前・カテゴリなど、気になることを自由に)</label>
@@ -1151,11 +1151,13 @@
         <div id="m-ai-feedback-list" style="margin-top:10px;"></div>
       </div>` : ''}
       <div class="modal-actions">
+        <button class="btn ghost" id="m-cancel">キャンセル</button>
         ${isEdit ? '<button class="btn danger" id="m-delete">削除</button>' : ''}
         <button class="btn" id="m-save">保存</button>
       </div>
     `);
-    if(isEdit){ renderPriceInfo(existing); renderAiFeedbackList(existing); }
+    document.getElementById('m-cancel').addEventListener('click', closeModal);
+    if(isEdit){ renderPriceInfo(existing); renderAiFeedbackList(existing); renderUndoBar(existing); }
     const aiSend = document.getElementById('m-ai-send');
     if(aiSend) aiSend.addEventListener('click', ()=> sendAiFeedback(existing));
     document.getElementById('m-save').addEventListener('click', async ()=>{
@@ -1275,6 +1277,8 @@
   async function applyAiSuggestion(habitId, field, value){
     const target = catalog.habits.find(h=>h.id===habitId);
     if(!target) return;
+    // Single-level undo: remember what this field was right before overwriting it.
+    target.undo = { field, previousValue: target[field] != null ? target[field] : null, ts: Date.now() };
     if(field === 'name'){
       target.name = value;
       const nameInput = document.getElementById('m-name');
@@ -1286,7 +1290,40 @@
     }
     await saveHabits();
     renderHabits();
-    showToast('AIの提案を適用しました');
+    renderUndoBar(target);
+    showToast('AIの提案を適用しました(元に戻すこともできます)');
+  }
+
+  function renderUndoBar(habit){
+    const box = document.getElementById('m-undo-bar');
+    if(!box) return;
+    if(!habit.undo){ box.innerHTML = ''; return; }
+    const fieldLabel = habit.undo.field === 'name' ? '名前' : 'カテゴリ';
+    let prevLabel = habit.undo.previousValue;
+    if(habit.undo.field === 'category'){
+      const c = CATEGORIES.find(c=>c.key===habit.undo.previousValue);
+      prevLabel = c ? c.label : habit.undo.previousValue;
+    }
+    box.innerHTML = `
+      <div style="background: rgba(139,74,68,.08); border:1px solid var(--brick); border-radius:3px; padding:10px 12px; margin-bottom:14px; font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <span>${fieldLabel}を変更しました</span>
+        <button class="gp-edit" id="m-undo-btn">「${escapeHtml(String(prevLabel))}」に戻す</button>
+      </div>`;
+    document.getElementById('m-undo-btn').addEventListener('click', async ()=>{
+      // Re-fetch by id: catalog.habits may have been replaced by a fresh
+      // snapshot from Firebase since this button was drawn.
+      const live = catalog.habits.find(h=>h.id===habit.id);
+      if(!live || !live.undo) return;
+      const field = live.undo.field;
+      live[field] = live.undo.previousValue;
+      delete live.undo;
+      if(field === 'name'){ const el = document.getElementById('m-name'); if(el) el.value = live.name || ''; }
+      if(field === 'category'){ const el = document.getElementById('m-cat'); if(el) el.value = live.category || 'other'; }
+      await saveHabits();
+      renderHabits();
+      renderUndoBar(live);
+      showToast('元に戻しました');
+    });
   }
 
   // Shows the current price, why it is what it is, and how it has moved.
@@ -1334,10 +1371,12 @@
       <div class="field"><label>ごほうびの名前</label><input type="text" id="m-name" value="${isEdit?escapeHtml(existing.name):''}" placeholder="例: 好きなお菓子"></div>
       <div class="field"><label>必要な金額</label><input type="number" id="m-cost" value="${isEdit?existing.cost:''}" placeholder="500"></div>
       <div class="modal-actions">
+        <button class="btn ghost" id="m-cancel">キャンセル</button>
         ${isEdit ? '<button class="btn danger" id="m-delete">削除</button>' : ''}
         <button class="btn" id="m-save">保存</button>
       </div>
     `);
+    document.getElementById('m-cancel').addEventListener('click', closeModal);
     document.getElementById('m-save').addEventListener('click', async ()=>{
       const name = document.getElementById('m-name').value.trim();
       const cost = parseInt(document.getElementById('m-cost').value) || 0;
