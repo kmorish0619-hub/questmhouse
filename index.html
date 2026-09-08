@@ -1218,8 +1218,8 @@
     const idx = cats.findIndex(c=>c.key===key);
     const swap = idx + dir;
     if(idx < 0 || swap < 0 || swap >= cats.length) return;
-    const a = cats[idx], b = cats[swap];
-    const tmp = a.order; a.order = b.order; b.order = tmp;
+    cats.splice(swap, 0, cats.splice(idx, 1)[0]);
+    cats.forEach((c,i)=>{ c.order = i; });   // rebuild, don't swap (see moveItem)
     catalog.categories = cats;
     await saveCategories();
     renderHabits();
@@ -1694,20 +1694,22 @@
     }
   }
 
-  // Resolves against the LIVE catalog at the moment of the tap, not whatever
-  // objects were current when the row was drawn — the Firebase listener can
-  // replace catalog.habits/rewards with fresh objects at any time (e.g. right
-  // after editing categories), which would otherwise silently orphan a stale
-  // reference and make the tap do nothing.
+  // Reorders by REBUILDING the whole group's order values from the resulting
+  // sequence, rather than swapping two `order` numbers. Swapping silently did
+  // nothing whenever the two items shared the same order value — which is the
+  // case for any habit created before `order` existed (its order is undefined,
+  // so `undefined <-> undefined` is a no-op and the list never moved).
   async function moveItem(kind, groupIds, itemId, dir){
     const list = kind === 'habit' ? catalog.habits : catalog.rewards;
-    const idx = groupIds.indexOf(itemId);
-    const swapId = groupIds[idx + dir];
-    if(idx < 0 || swapId == null) return;
-    const a = list.find(x => x.id === itemId);
-    const b = list.find(x => x.id === swapId);
-    if(!a || !b) return;
-    const tmp = a.order; a.order = b.order; b.order = tmp;
+    const ids = groupIds.slice();
+    const idx = ids.indexOf(itemId);
+    const swap = idx + dir;
+    if(idx < 0 || swap < 0 || swap >= ids.length) return;
+    ids.splice(swap, 0, ids.splice(idx, 1)[0]);   // move the item to its new slot
+    ids.forEach((id, i) => {
+      const item = list.find(x => x.id === id);
+      if(item) item.order = i;                    // dense, always-distinct ordering
+    });
     if(kind === 'habit'){ await saveHabits(); renderHabits(); }
     else { await saveRewards(); renderRewards(); }
   }
