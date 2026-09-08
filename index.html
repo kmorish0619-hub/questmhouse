@@ -115,11 +115,18 @@
   .trend-tag.down{ background: rgba(75,99,85,.14); color: var(--sage); }
   .reward-info .rmeta{ font-size:12px; color: var(--mustard-deep); font-weight:600; }
 
-  .item-controls{ display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; }
-  .fav-btn{ background:none; border:none; font-size:16px; color: var(--line); cursor:pointer; padding:0 2px; line-height:1; }
+  .item-controls{ display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; }
+  .fav-btn{ background:none; border:none; font-size:18px; color: var(--line); cursor:pointer;
+    padding:6px; line-height:1; min-width:34px; min-height:34px; display:flex; align-items:center; justify-content:center; }
   .fav-btn.on{ color: var(--mustard); }
-  .order-btn{ background:none; border:none; font-size:9px; color: var(--ink-soft); cursor:pointer; padding:1px 3px; line-height:1; }
+  .order-btn{ background: var(--paper-alt); border:1px solid var(--line); border-radius:4px; color: var(--ink-soft);
+    cursor:pointer; padding:0; line-height:1; min-width:34px; min-height:26px; font-size:13px;
+    display:flex; align-items:center; justify-content:center; }
   .order-btn:disabled{ opacity:.25; cursor:default; }
+  .order-btn:active{ background: var(--line); }
+
+  .cat-controls{ display:flex; align-items:center; gap:8px; }
+  .cat-controls .order-btn{ min-width:38px; min-height:38px; font-size:15px; }
 
   .check-btn{ width:36px; height:36px; border-radius:50%; border:2px solid var(--sage); background: var(--paper-alt);
     display:flex; align-items:center; justify-content:center; color: var(--sage); font-size:15px; flex-shrink:0; cursor:pointer;
@@ -342,6 +349,7 @@
     <div class="select-bar">
       <button id="select-toggle">まとめて選ぶ</button>
       <span class="sel-count" id="sel-count"></span>
+      <button id="manage-cat-btn" style="display:none">カテゴリを編集</button>
       <button id="select-all" style="display:none">全選択</button>
       <button id="select-delete" class="danger-mini" style="display:none">削除</button>
     </div>
@@ -565,12 +573,15 @@
   const LS_FAV_R = 'mq-fav-rewards';
 
   const WINDOW_DAYS = 7;
-  const CATEGORIES = [
-    { key:'diet',   label:'ダイエット' },
-    { key:'health', label:'健康' },
-    { key:'chore',  label:'家事' },
-    { key:'other',  label:'その他' }
+  const DEFAULT_CATEGORIES = [
+    { key:'diet',   label:'ダイエット', order:0 },
+    { key:'health', label:'健康',       order:1 },
+    { key:'chore',  label:'家事',       order:2 },
+    { key:'other',  label:'その他',     order:3 }
   ];
+  function getCategories(){
+    return sortByOrder(catalog.categories && catalog.categories.length ? catalog.categories : DEFAULT_CATEGORIES);
+  }
 
   // ---------- State ----------
   let myName = '';
@@ -590,8 +601,9 @@
   let favR = {};
   let groupListeners = [];
   let seedGuard = {};                  // gid -> true, prevents repeat seeding in one session
+  let catSeedGuard = {};                // gid -> true, same guard for the category seed
 
-  function emptyCatalog(){ return { habits: [], rewards: [], goalYear: '', goalMonth: '', seeded: false }; }
+  function emptyCatalog(){ return { habits: [], rewards: [], categories: [], goalYear: '', goalMonth: '', seeded: false, categoriesSeeded: false }; }
 
   // ---------- Small helpers ----------
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -715,12 +727,15 @@
       catalog = {
         habits:  toArray(v.habits),
         rewards: toArray(v.rewards),
+        categories: toArray(v.categories),
         goalYear:  v.goalYear  || '',
         goalMonth: v.goalMonth || '',
-        seeded: !!v.seeded
+        seeded: !!v.seeded,
+        categoriesSeeded: !!v.categoriesSeeded
       };
       renderAll();
       maybeSeedDefaults(gid);
+      maybeSeedCategories(gid);
     }, e=>console.error('catalog listener', e));
     groupListeners.push({ref:cRef, cb:cCb});
 
@@ -760,6 +775,7 @@
     currentGid = gid;
     saveGid();
     seedGuard = {};
+    catSeedGuard = {};
     attachGroupListeners(gid);
     renderAll();
   }
@@ -880,6 +896,26 @@
       gRef(gid).child('catalog').update({ habits: mergedH, rewards: mergedR })
         .catch(e=>console.error('seed failed', e));
     });
+  }
+
+  // Separate one-time seed for categories, so groups created before this
+  // feature existed (which already have habits/rewards and seeded=true) still
+  // get a starting category list without re-seeding anything else.
+  function maybeSeedCategories(gid){
+    if(!db || catalog.categoriesSeeded || catSeedGuard[gid]) return;
+    catSeedGuard[gid] = true;
+    gRef(gid).child('catalog/categoriesSeeded').transaction(cur => (cur ? undefined : true), (err, committed) => {
+      if(err || !committed) return;
+      if(catalog.categories && catalog.categories.length) return; // already has some
+      gRef(gid).child('catalog/categories').set(DEFAULT_CATEGORIES.map(c=>({...c})))
+        .catch(e=>console.error('category seed failed', e));
+    });
+  }
+
+  function saveCategories(){
+    if(!db || !currentGid) return Promise.resolve();
+    return gRef(currentGid).child('catalog/categories').set(catalog.categories)
+      .catch(e=>{ console.error(e); showToast('保存できませんでした。通信状況をご確認ください'); });
   }
 
   // ---------- Pricing (scoped to the current group only) ----------
@@ -1128,6 +1164,138 @@
     }
   }
 
+  // ---------- Category management (big sections: ダイエット/健康/家事/その他 etc.) ----------
+  function ensureCategoriesInitialised(){
+    if(!catalog.categories || !catalog.categories.length){
+      catalog.categories = DEFAULT_CATEGORIES.map(c=>({...c}));
+    }
+  }
+
+  function openCategoryModal(){
+    ensureCategoriesInitialised();
+    const cats = getCategories();
+    openModal(`
+      <h3>カテゴリを編集</h3>
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 12px;">並び替えると習慣一覧の表示順も変わります。削除すると、そのカテゴリの習慣は自動で別のカテゴリに移動します。</p>
+      <div id="cat-manage-list">
+        ${cats.map((c,i)=>`
+          <div class="group-pick">
+            <div class="gp-name">${escapeHtml(c.label)}</div>
+            <div class="cat-controls">
+              <button class="order-btn" data-cat-up="${c.key}" ${i===0?'disabled':''}>▲</button>
+              <button class="order-btn" data-cat-down="${c.key}" ${i===cats.length-1?'disabled':''}>▼</button>
+              <button class="gp-edit" data-cat-rename="${c.key}">名前</button>
+              <button class="gp-edit" data-cat-del="${c.key}">削除</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="modal-actions" style="margin-top:14px;">
+        <button class="btn ghost" id="cat-add-btn">カテゴリを追加</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cat-close-btn">閉じる</button>
+      </div>
+    `);
+    modalBody.querySelectorAll('[data-cat-up]').forEach(b=>{
+      b.addEventListener('click', ()=> moveCategory(b.dataset.catUp, -1));
+    });
+    modalBody.querySelectorAll('[data-cat-down]').forEach(b=>{
+      b.addEventListener('click', ()=> moveCategory(b.dataset.catDown, 1));
+    });
+    modalBody.querySelectorAll('[data-cat-rename]').forEach(b=>{
+      b.addEventListener('click', ()=> openCategoryRenameModal(b.dataset.catRename));
+    });
+    modalBody.querySelectorAll('[data-cat-del]').forEach(b=>{
+      b.addEventListener('click', ()=> openCategoryDeleteModal(b.dataset.catDel));
+    });
+    document.getElementById('cat-add-btn').addEventListener('click', openCategoryAddModal);
+    document.getElementById('cat-close-btn').addEventListener('click', closeModal);
+  }
+
+  async function moveCategory(key, dir){
+    ensureCategoriesInitialised();
+    const cats = getCategories();
+    const idx = cats.findIndex(c=>c.key===key);
+    const swap = idx + dir;
+    if(idx < 0 || swap < 0 || swap >= cats.length) return;
+    const a = cats[idx], b = cats[swap];
+    const tmp = a.order; a.order = b.order; b.order = tmp;
+    catalog.categories = cats;
+    await saveCategories();
+    renderHabits();
+    openCategoryModal();
+  }
+
+  function openCategoryAddModal(){
+    openModal(`
+      <h3>カテゴリを追加</h3>
+      <div class="field"><input type="text" id="cat-name" placeholder="例: 育児"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cat-cancel">キャンセル</button>
+        <button class="btn" id="cat-save">追加する</button>
+      </div>
+    `);
+    document.getElementById('cat-cancel').addEventListener('click', openCategoryModal);
+    document.getElementById('cat-save').addEventListener('click', async ()=>{
+      const label = document.getElementById('cat-name').value.trim();
+      if(!label) return;
+      ensureCategoriesInitialised();
+      const maxOrder = catalog.categories.reduce((m,c)=>Math.max(m,c.order||0), -1);
+      catalog.categories.push({ key: uid(), label, order: maxOrder + 1 });
+      await saveCategories();
+      renderHabits();
+      openCategoryModal();
+    });
+  }
+
+  function openCategoryRenameModal(key){
+    const cat = getCategories().find(c=>c.key===key);
+    if(!cat) return;
+    openModal(`
+      <h3>カテゴリ名を変更</h3>
+      <div class="field"><input type="text" id="cat-name" value="${escapeHtml(cat.label)}"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cat-cancel">キャンセル</button>
+        <button class="btn" id="cat-save">保存</button>
+      </div>
+    `);
+    document.getElementById('cat-cancel').addEventListener('click', openCategoryModal);
+    document.getElementById('cat-save').addEventListener('click', async ()=>{
+      const label = document.getElementById('cat-name').value.trim();
+      if(!label) return;
+      const target = catalog.categories.find(c=>c.key===key);
+      if(target) target.label = label;
+      await saveCategories();
+      renderHabits();
+      openCategoryModal();
+    });
+  }
+
+  function openCategoryDeleteModal(key){
+    const cats = getCategories();
+    const cat = cats.find(c=>c.key===key);
+    if(!cat) return;
+    if(cats.length <= 1){ showToast('最後の1つは削除できません'); return; }
+    const affected = catalog.habits.filter(h => (h.category||cats[0].key) === key).length;
+    const fallback = cats.find(c=>c.key !== key);
+    openModal(`
+      <h3>「${escapeHtml(cat.label)}」を削除しますか?</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">${affected > 0 ? `このカテゴリの習慣 ${affected}件 は「${escapeHtml(fallback.label)}」に移動します。` : 'このカテゴリに習慣はありません。'}</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cat-cancel">キャンセル</button>
+        <button class="btn danger" id="cat-del-ok">削除する</button>
+      </div>
+    `);
+    document.getElementById('cat-cancel').addEventListener('click', openCategoryModal);
+    document.getElementById('cat-del-ok').addEventListener('click', async ()=>{
+      catalog.habits.forEach(h=>{ if((h.category||fallback.key) === key) h.category = fallback.key; });
+      catalog.categories = cats.filter(c=>c.key !== key);
+      await Promise.all([saveCategories(), saveHabits()]);
+      renderHabits();
+      openCategoryModal();
+    });
+  }
+
   function openHabitModal(existing){
     const isEdit = !!existing;
     openModal(`
@@ -1135,7 +1303,7 @@
       <div class="field"><label>習慣の名前</label><input type="text" id="m-name" value="${isEdit?escapeHtml(existing.name):''}" placeholder="例: 皿洗い"></div>
       <div class="field"><label>カテゴリ</label>
         <select id="m-cat">
-          ${CATEGORIES.map(c=>`<option value="${c.key}" ${isEdit&&existing.category===c.key?'selected':''}>${c.label}</option>`).join('')}
+          ${getCategories().map(c=>`<option value="${c.key}" ${isEdit&&existing.category===c.key?'selected':''}>${c.label}</option>`).join('')}
         </select>
       </div>
       <div class="field"><label>時間(分・任意)</label><input type="number" id="m-min" value="${isEdit&&existing.minutes!=null?existing.minutes:''}" placeholder="10"></div>
@@ -1205,7 +1373,7 @@
     const list = (habit.aiFeedback || []).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,5);
     if(!list.length){ box.innerHTML = ''; return; }
     box.innerHTML = list.map((f,i) => {
-      const catLabel = f.suggestedCategory ? (CATEGORIES.find(c=>c.key===f.suggestedCategory)||{}).label : null;
+      const catLabel = f.suggestedCategory ? (getCategories().find(c=>c.key===f.suggestedCategory)||{}).label : null;
       const actions = [];
       if(f.suggestedName) actions.push(`<button class="gp-edit" data-apply-name="${i}">「${escapeHtml(f.suggestedName)}」に変更</button>`);
       if(f.suggestedCategory) actions.push(`<button class="gp-edit" data-apply-cat="${i}">「${escapeHtml(catLabel||f.suggestedCategory)}」に変更</button>`);
@@ -1234,8 +1402,8 @@
     btn.disabled = true; btn.textContent = '考え中…';
 
     const { price, mult } = computeHabitPrice(habit);
-    const catList = CATEGORIES.map(c=>`${c.key}(${c.label})`).join('、');
-    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n現在の金額: ¥${price}(基準の${mult.toFixed(2)}倍)\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」または「1.00」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n調整: X.XX (金額に関する意見の時だけ0.7〜1.3の範囲で。それ以外は1.00)\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${CATEGORIES.map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信\n\nカテゴリの選択肢: ${catList}`;
+    const catList = getCategories().map(c=>`${c.key}(${c.label})`).join('、');
+    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n現在の金額: ¥${price}(基準の${mult.toFixed(2)}倍)\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」または「1.00」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n調整: X.XX (金額に関する意見の時だけ0.7〜1.3の範囲で。それ以外は1.00)\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${getCategories().map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信\n\nカテゴリの選択肢: ${catList}`;
     const system = 'あなたは家族の家事・習慣共有アプリのアシスタントです。家族からの意見(金額・名前・カテゴリなど)を読み取り、妥当な提案をします。指定された出力形式を厳密に守ってください。';
     const reply = await callAI(system, prompt, 250);
 
@@ -1250,7 +1418,7 @@
       if(mName && !/^なし/.test(mName[1].trim())) suggestedName = mName[1].trim();
 
       const mCat = reply.match(/提案カテゴリ\s*[:：]\s*(\w+)/);
-      if(mCat && CATEGORIES.some(c=>c.key===mCat[1])) suggestedCategory = mCat[1];
+      if(mCat && getCategories().some(c=>c.key===mCat[1])) suggestedCategory = mCat[1];
 
       const mReply = reply.match(/返信\s*[:：]\s*([\s\S]+)/);
       replyText = (mReply ? mReply[1] : reply).trim() || replyText;
@@ -1301,7 +1469,7 @@
     const fieldLabel = habit.undo.field === 'name' ? '名前' : 'カテゴリ';
     let prevLabel = habit.undo.previousValue;
     if(habit.undo.field === 'category'){
-      const c = CATEGORIES.find(c=>c.key===habit.undo.previousValue);
+      const c = getCategories().find(c=>c.key===habit.undo.previousValue);
       prevLabel = c ? c.label : habit.undo.previousValue;
     }
     box.innerHTML = `
@@ -1526,11 +1694,19 @@
     }
   }
 
-  async function moveItem(kind, group, item, dir){
-    const idx = group.findIndex(i => i.id === item.id);
-    const swap = idx + dir;
-    if(idx < 0 || swap < 0 || swap >= group.length) return;
-    const a = group[idx], b = group[swap];
+  // Resolves against the LIVE catalog at the moment of the tap, not whatever
+  // objects were current when the row was drawn — the Firebase listener can
+  // replace catalog.habits/rewards with fresh objects at any time (e.g. right
+  // after editing categories), which would otherwise silently orphan a stale
+  // reference and make the tap do nothing.
+  async function moveItem(kind, groupIds, itemId, dir){
+    const list = kind === 'habit' ? catalog.habits : catalog.rewards;
+    const idx = groupIds.indexOf(itemId);
+    const swapId = groupIds[idx + dir];
+    if(idx < 0 || swapId == null) return;
+    const a = list.find(x => x.id === itemId);
+    const b = list.find(x => x.id === swapId);
+    if(!a || !b) return;
     const tmp = a.order; a.order = b.order; b.order = tmp;
     if(kind === 'habit'){ await saveHabits(); renderHabits(); }
     else { await saveRewards(); renderRewards(); }
@@ -1602,7 +1778,7 @@
       html += `<div class="cat-label">お気に入り</div>`;
       html += favItems.map((h,i)=>row(h,i,favItems,true)).join('');
     }
-    CATEGORIES.forEach(cat=>{
+    getCategories().forEach(cat=>{
       const items = sortByOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
       if(!items.length) return;
       html += `<div class="cat-label">${cat.label}</div>`;
@@ -1622,11 +1798,12 @@
     el.querySelectorAll('[data-fav]').forEach(btn=>{
       btn.addEventListener('click', ()=> toggleFavorite('habit', catalog.habits.find(h=>h.id===btn.dataset.fav)));
     });
-    CATEGORIES.forEach(cat=>{
+    getCategories().forEach(cat=>{
       const group = sortByOrder(catalog.habits.filter(h => (h.category||'other') === cat.key));
+      const groupIds = group.map(x=>x.id);
       group.forEach(h=>{
-        el.querySelectorAll(`[data-up="${h.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('habit', group, h, -1)));
-        el.querySelectorAll(`[data-down="${h.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('habit', group, h, 1)));
+        el.querySelectorAll(`[data-up="${h.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('habit', groupIds, h.id, -1)));
+        el.querySelectorAll(`[data-down="${h.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('habit', groupIds, h.id, 1)));
       });
     });
   }
@@ -1684,8 +1861,9 @@
       btn.addEventListener('click', ()=> toggleFavorite('reward', catalog.rewards.find(r=>r.id===btn.dataset.fav)));
     });
     all.forEach(r=>{
-      el.querySelectorAll(`[data-up="${r.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('reward', all, r, -1)));
-      el.querySelectorAll(`[data-down="${r.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('reward', all, r, 1)));
+      const allIds = all.map(x=>x.id);
+      el.querySelectorAll(`[data-up="${r.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('reward', allIds, r.id, -1)));
+      el.querySelectorAll(`[data-down="${r.id}"]`).forEach(b=>b.addEventListener('click', ()=>moveItem('reward', allIds, r.id, 1)));
     });
   }
 
@@ -2169,6 +2347,7 @@
     const all = document.getElementById('select-all');
     const del = document.getElementById('select-delete');
     const count = document.getElementById('sel-count');
+    const catBtn = document.getElementById('manage-cat-btn');
     toggle.textContent = selectMode ? '選択をやめる' : 'まとめて選ぶ';
     all.style.display = selectMode ? '' : 'none';
     del.style.display = selectMode ? '' : 'none';
@@ -2176,7 +2355,9 @@
     count.textContent = selectMode ? `${picked.size}件を選択中` : '';
     const total = currentListItems().length;
     all.textContent = (picked.size === total && total > 0) ? '全解除' : '全選択';
+    catBtn.style.display = (subTab === 'habit' && !selectMode) ? '' : 'none';
   }
+  document.getElementById('manage-cat-btn').addEventListener('click', openCategoryModal);
   document.getElementById('select-toggle').addEventListener('click', ()=>{
     selectMode = !selectMode;
     picked.clear();
