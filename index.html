@@ -456,22 +456,19 @@
     <div class="card">
       <h3>相場の変動ルール</h3>
       <div class="setting-note">
-        金額は<b>1円単位</b>で常に変動し、同じグループ内の記録だけで計算されます。<br><br>
-        <b>1. 習慣ごとの「本来のペース」を見ます</b><br>
-        毎日やるもの(食事・皿洗い)と、たまにやるもの(布団干し・窓拭き)を区別します。名前と実際の記録から自動で判断しますが、編集画面で「何日に1回やりたいか」を指定すればそちらが優先されます。<br><br>
-        <b>2. ペースより遅れていると値上がりします</b><br>
-        毎日やるものは1日空けば上がり始めますが、週1のものは7日周期を基準に判断するので、5日空いた程度では上がりません。やり忘れが続くほど高くなり、自然と目が向くようになります。<br><br>
-        <b>3. 手間も考慮します</b><br>
-        名前(「作る」「掃除」など)と所要時間から、その作業の重さを推定して金額に反映します。<br><br>
-        <b>4. 偏りを調整します</b><br>
-        一人に集中していると値上がり、2人以上で分担できていると値下がりします。<br><br>
-        変動幅は基本金額の0.5倍〜2.5倍まで。追加から24時間は基本金額のままです。習慣の編集画面を開くと、その習慣の価格推移グラフと、いまの金額になっている理由の内訳が見られます。
+        金額 = <b>基本金額 × その日の倍率</b>のシンプルな計算です。同じグループ内の記録だけで計算されます。<br><br>
+        <b>その日の倍率は、1日1回だけ決まります(値上げモードのみ)</b><br>
+        値上げモードの習慣は、その日最初にアプリが開かれたタイミングで、その日ぶんの倍率が全習慣分まとめて確定・保存されます。以降その日は、誰が何時に達成ボタンを押しても同じ金額です(押す順番による損得はありません)。日をまたぐと、また新しく計算し直されます。<br><br>
+        <b>習慣ごとに「値上げモード」か「ボーナスモード」かを選べます</b>(編集画面で変更可、デフォルトはカテゴリ由来: 家事→値上げ、ダイエット/健康→ボーナス、その他→値上げ)<br>
+        ・値上げモード: 本来のペースより遅れるほど値上がりします(誰かがやらないと困る家事向け・家族全体で共通の1つの金額)<br>
+        ・ボーナスモード: <b>1人ずつ個人の連続日数</b>で計算します(3日連続で+10%、7日以上連続で+20%)。同じ習慣でも人によって金額が変わります(続けること自体が価値のある習慣向け)<br><br>
+        変動幅は基本金額の0.5倍〜2.5倍まで。追加から24時間は基本金額のままです。習慣の編集画面を開くと、その習慣の価格推移グラフと、いまの金額になっている理由が見られます。
       </div>
     </div>
 
     <div class="card">
       <h3>一覧をコピー</h3>
-      <div class="setting-note">習慣・ごほうびの名前/カテゴリ/基本金額/現在の金額とその内訳、家族からの意見とAIの返信の履歴をテキストでまとめてコピーします。相場の相談などで外部に貼り付けて使えます。</div>
+      <div class="setting-note">習慣・ごほうびの名前/カテゴリ/モード/基本金額/今日の金額とその理由、家族からの意見とAIの返信の履歴をテキストでまとめてコピーします。相場の相談などで外部に貼り付けて使えます。</div>
       <button class="btn ghost" id="export-copy-btn" style="margin-top:10px;">習慣・ごほうび一覧をコピー</button>
     </div>
 
@@ -479,7 +476,7 @@
       <h3>AI機能について</h3>
       <div class="setting-note">
         「今日のAIの一言」はホームに1日1回、家族の様子から自動で表示されます(全員が別々に生成しないよう、1日1回だけ呼び出します)。<br><br>
-        習慣の編集画面の「AIへの一言」からは、金額・名前・カテゴリなど気になることを自由に送れます。AIが内容を判断し、金額なら最大±30%反映、名前やカテゴリなら提案として表示され、「変更」ボタンで適用できます。やり取りの履歴は編集画面に残ります。実際に反映された金額は、AIの返信文とは別に、システム側が計算した数字として表示されます。
+        習慣の編集画面の「AIへの一言」からは、金額・名前・カテゴリなど気になることを自由に送れます。AIが内容を判断し、妥当なら新しい基本金額・名前・カテゴリを提案として表示し、「変更」ボタンを押すと初めて適用されます(自動では反映されません)。やり取りの履歴は編集画面に残ります。
       </div>
     </div>
 
@@ -596,6 +593,7 @@
   let currentGid = '';
   let groupsMeta = {};                 // { gid: {name, createdAt} }
   let groupJoinCode = '';              // join code of the currently-open group (only known once unlocked)
+  let dailyPricing = null;             // { [habitId]: {m, r} } — today's locked multipliers for the current group
   let catalog = emptyCatalog();
   let events = [];
   let members = {};                    // { encodedName: {name, joinedAt} }
@@ -613,7 +611,7 @@
   let seedGuard = {};                  // gid -> true, prevents repeat seeding in one session
   let catSeedGuard = {};                // gid -> true, same guard for the category seed
 
-  function emptyCatalog(){ return { habits: [], rewards: [], categories: [], goalYear: '', goalMonth: '', seeded: false, categoriesSeeded: false }; }
+  function emptyCatalog(){ return { habits: [], rewards: [], categories: [], goalYear: '', goalMonth: '', seeded: false, categoriesSeeded: false, pricingV2: false }; }
 
   // ---------- Small helpers ----------
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -759,6 +757,7 @@
     aiComment = null;
     aiCommentAttempted = false;
     groupJoinCode = '';
+    dailyPricing = null;
     renderAll();
     if(!db || !gid) return;
 
@@ -783,13 +782,24 @@
         goalYear:  v.goalYear  || '',
         goalMonth: v.goalMonth || '',
         seeded: !!v.seeded,
-        categoriesSeeded: !!v.categoriesSeeded
+        categoriesSeeded: !!v.categoriesSeeded,
+        pricingV2: !!v.pricingV2
       };
       renderAll();
       maybeSeedDefaults(gid);
       maybeSeedCategories(gid);
+      cleanupLegacyPricingFields(gid);
+      ensureDailyPricingLocked(gid);
     }, e=>console.error('catalog listener', e));
     groupListeners.push({ref:cRef, cb:cCb});
+
+    const dpRef = gRef(gid).child('dailyPricing/'+todayStr());
+    const dpCb = dpRef.on('value', snap=>{
+      dailyPricing = snap.val();
+      renderAll();
+      if(!dailyPricing) ensureDailyPricingLocked(gid);
+    }, e=>console.error('dailyPricing listener', e));
+    groupListeners.push({ref:dpRef, cb:dpCb});
 
     const eRef = gRef(gid).child('events');
     const eCb = eRef.on('value', snap=>{
@@ -950,59 +960,26 @@
   }
 
   // ---------- Default content ----------
+  // 3 per category (chore/diet/health/other), 3 rewards — kept small on
+  // purpose so a new group starts simple; add more from the app as needed.
   const DEFAULT_HABITS = [
     { name:'体重を測る', category:'diet', minutes:5, basePrice:50 },
     { name:'間食を我慢する', category:'diet', minutes:null, basePrice:100 },
-    { name:'野菜から先に食べる', category:'diet', minutes:null, basePrice:50 },
-    { name:'腹八分目を意識する', category:'diet', minutes:null, basePrice:50 },
-    { name:'白米を控えめにする', category:'diet', minutes:null, basePrice:50 },
-    { name:'夜9時以降は食べない', category:'diet', minutes:null, basePrice:100 },
     { name:'ウォーキング30分', category:'diet', minutes:30, basePrice:150 },
-    { name:'階段を使う', category:'diet', minutes:5, basePrice:50 },
     { name:'7時間睡眠', category:'health', minutes:null, basePrice:100 },
     { name:'ストレッチ', category:'health', minutes:10, basePrice:50 },
-    { name:'早寝早起き', category:'health', minutes:null, basePrice:80 },
-    { name:'水を2L飲む', category:'health', minutes:null, basePrice:80 },
-    { name:'歯磨き後にフロス', category:'health', minutes:5, basePrice:30 },
     { name:'筋トレ', category:'health', minutes:20, basePrice:150 },
-    { name:'瞑想・深呼吸5分', category:'health', minutes:5, basePrice:50 },
-    { name:'日光浴10分', category:'health', minutes:10, basePrice:50 },
     { name:'皿洗い', category:'chore', minutes:10, basePrice:100 },
     { name:'洗濯を回す', category:'chore', minutes:5, basePrice:80 },
-    { name:'洗濯物を畳む', category:'chore', minutes:10, basePrice:80 },
-    { name:'掃除機がけ', category:'chore', minutes:15, basePrice:100 },
-    { name:'お風呂掃除', category:'chore', minutes:15, basePrice:100 },
-    { name:'トイレ掃除', category:'chore', minutes:10, basePrice:100 },
     { name:'ゴミ出し', category:'chore', minutes:5, basePrice:60 },
-    { name:'食事を作る', category:'chore', minutes:30, basePrice:200 },
-    { name:'食材の買い出し', category:'chore', minutes:30, basePrice:150 },
-    { name:'玄関の掃き掃除', category:'chore', minutes:10, basePrice:60 },
-    { name:'子どもの送り迎え', category:'other', minutes:20, basePrice:150 },
     { name:'子どもと遊ぶ30分', category:'other', minutes:30, basePrice:100 },
     { name:'読書30分', category:'other', minutes:30, basePrice:80 },
     { name:'家計簿をつける', category:'other', minutes:10, basePrice:80 }
   ];
   const DEFAULT_REWARDS = [
     { name:'好きなお菓子', cost:300 },
-    { name:'コンビニスイーツ', cost:250 },
-    { name:'カフェでコーヒー', cost:400 },
     { name:'映画を1本見る', cost:500 },
-    { name:'マンガ1冊購入', cost:600 },
-    { name:'ゲームを1時間する', cost:300 },
-    { name:'お酒を1杯', cost:400 },
-    { name:'マッサージ30分', cost:1000 },
-    { name:'好きな本を買う', cost:800 },
-    { name:'外食ランチ', cost:1000 },
-    { name:'昼寝30分', cost:200 },
-    { name:'趣味の時間1時間', cost:400 },
-    { name:'新しい文房具', cost:500 },
-    { name:'好きな音楽でのんびりタイム', cost:200 },
-    { name:'ネイル・散髪', cost:1500 },
-    { name:'ゲームソフト購入', cost:3000 },
-    { name:'家族で外食', cost:3000 },
-    { name:'ちょっと良いコーヒー豆', cost:700 },
-    { name:'お花を買う', cost:500 },
-    { name:'半日フリー(家事免除)', cost:2000 }
+    { name:'外食ランチ', cost:1000 }
   ];
 
   // Groups created before the join-code feature existed have no code at all.
@@ -1066,45 +1043,37 @@
     }
     return out;
   }
-  // Keyword hints used to guess how demanding a habit is and how often it is
-  // normally expected. This is a heuristic, not real language understanding —
-  // an explicit cadence set by the user always overrides it.
-  const EFFORT_HINTS = [
-    { re: /(作る|料理|自炊|調理|弁当)/,            effort: 1.35, cadence: 1 },
-    { re: /(掃除|そうじ|磨|拭|片付|整理)/,          effort: 1.20, cadence: 3 },
-    { re: /(洗濯|洗い|干す|畳|たた)/,              effort: 1.15, cadence: 1 },
-    { re: /(買い物|買い出し|送り|迎え)/,            effort: 1.25, cadence: 3 },
-    { re: /(筋トレ|ジム|ラン|走|トレーニング)/,      effort: 1.30, cadence: 2 },
-    { re: /(ウォーキング|散歩|歩)/,                effort: 1.10, cadence: 1 },
-    { re: /(ゴミ|ごみ)/,                          effort: 0.95, cadence: 3 },
-    { re: /(布団|シーツ|カーテン|窓|換気扇|排水|草)/, effort: 1.20, cadence: 7 },
-    { re: /(測る|計る|記録|つける|飲む|読む)/,       effort: 0.85, cadence: 1 },
-    { re: /(我慢|控え|やめる|抜き)/,               effort: 1.10, cadence: 1 },
-    { re: /(ストレッチ|瞑想|深呼吸|日光)/,          effort: 0.90, cadence: 1 },
-    { re: /(睡眠|早寝|早起き|眠)/,                 effort: 1.00, cadence: 1 }
+  // Keyword hints used to guess a habit's normal rhythm (how many days
+  // between times it's expected). This is a heuristic, not real language
+  // understanding — an explicit cadence set by the user always overrides it.
+  const CADENCE_HINTS = [
+    { re: /(作る|料理|自炊|調理|弁当)/,            cadence: 1 },
+    { re: /(掃除|そうじ|磨|拭|片付|整理)/,          cadence: 3 },
+    { re: /(洗濯|洗い|干す|畳|たた)/,              cadence: 1 },
+    { re: /(買い物|買い出し|送り|迎え)/,            cadence: 3 },
+    { re: /(筋トレ|ジム|ラン|走|トレーニング)/,      cadence: 2 },
+    { re: /(ウォーキング|散歩|歩)/,                cadence: 1 },
+    { re: /(ゴミ|ごみ)/,                          cadence: 3 },
+    { re: /(布団|シーツ|カーテン|窓|換気扇|排水|草)/, cadence: 7 },
+    { re: /(測る|計る|記録|つける|飲む|読む)/,       cadence: 1 },
+    { re: /(我慢|控え|やめる|抜き)/,               cadence: 1 },
+    { re: /(ストレッチ|瞑想|深呼吸|日光)/,          cadence: 1 },
+    { re: /(睡眠|早寝|早起き|眠)/,                 cadence: 1 }
   ];
 
-  // Longer window than before so weekly/monthly chores are judged fairly.
-  const LONG_WINDOW = 28;
-
   function habitProfile(habit){
-    let effort = 1, cadence = null, source = 'ふつうの手間として扱っています';
-    for(const h of EFFORT_HINTS){
+    let cadence = null, source = 'ふつうのペースとして扱っています';
+    for(const h of CADENCE_HINTS){
       if(h.re.test(habit.name)){
-        effort = h.effort; cadence = h.cadence;
+        cadence = h.cadence;
         source = `名前から「${h.re.source.replace(/[()\\|]/g,' ').trim().split(/\s+/)[0]}」系の作業と判断`;
         break;
       }
     }
-    if(habit.minutes != null){
-      // Time is a stronger signal than the name when it is given.
-      effort *= (0.85 + Math.min(habit.minutes, 60) / 60 * 0.5);
-      source += `／所要${habit.minutes}分を考慮`;
-    }
     // An explicit setting always wins over the guess.
     if(habit.cadenceDays) { cadence = habit.cadenceDays; source += '／実施間隔は手動設定'; }
     if(!cadence) cadence = observedCadence(habit) || 1;
-    return { effort, cadence, source };
+    return { cadence, source };
   }
 
   // Learns the habit's own rhythm from history: the typical gap between times
@@ -1127,82 +1096,137 @@
     return Math.round((new Date(asOf) - new Date(dates[dates.length-1])) / 86400000);
   }
 
-  // Full pricing model. Returns the price plus a plain-language explanation of
-  // every factor, so the app can tell the family WHY something costs what it does.
-  // `asOf` defaults to today; priceHistory() passes past dates to reconstruct
-  // what the price would have looked like then.
-  function computeHabitPrice(habit, asOf){
-    asOf = asOf || todayStr();
-    const base = habit.basePrice || 0;
+  // How many days in a row, ENDING THE DAY BEFORE asOf, a specific person did
+  // the habit. Deliberately excludes asOf itself — this is "the streak
+  // they'd be extending if they did it today" — and deliberately never looks
+  // at asOf's own events, so it can never be shifted by press order within
+  // the same day, unlike the household-wide surge-mode calculation.
+  function currentStreak(habit, asOf, personName){
+    if(!personName) return 0;
+    let d = new Date(asOf);
+    d.setDate(d.getDate() - 1);
+    let streak = 0;
+    while(streak < 60){
+      const ds = localDate(d);
+      if(!events.some(e => e.type==='habit' && e.itemId===habit.id && e.name===personName && e.date===ds)) break;
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  }
+
+  // Each habit runs in one of two modes. Category picks the default, but it
+  // can be overridden per habit (habit.mode) in the edit screen.
+  function defaultModeForCategory(cat){
+    return (cat === 'diet' || cat === 'health') ? 'bonus' : 'surge';
+  }
+  function habitMode(habit){
+    return habit.mode || defaultModeForCategory(habit.category);
+  }
+
+  // The ONE dynamic factor left in the pricing model. Deterministic given the
+  // habit's config and history — same inputs always produce the same output.
+  // Surge mode is household-wide (someone doing it clears the backlog for
+  // everyone); bonus mode is personal (continuing YOUR OWN streak), so it
+  // takes whose streak to use.
+  function computeDailyMultiplier(habit, asOf, personName){
+    const mode = habitMode(habit);
     const prof = habitProfile(habit);
-    const reasons = [];
-
-    if(habit.createdAt && (new Date(asOf) - habit.createdAt) < 24*3600*1000){
-      // The 24h grace period only holds off the automatic algorithm — an
-      // explicit AI adjustment from family feedback should still count.
-      const adj = (habit.aiAdjust && habit.aiAdjust !== 1) ? habit.aiAdjust : 1;
-      const reasons = ['追加から24時間は基本金額のままです(自動の値動きなし)'];
-      if(adj !== 1) reasons.push(`家族からの意見を受けたAIの判断で ${adj > 1 ? '上乗せ' : '割引'}(${adj.toFixed(2)}倍)`);
-      return { price: Math.max(1, Math.round(base * adj)), mult: adj, profile: prof, reasons };
-    }
-
     let mult = 1;
-
-    // 1) How demanding the task itself looks.
-    if(prof.effort !== 1){
-      mult *= prof.effort;
-      reasons.push(prof.effort > 1
-        ? `手間のかかる作業と判断し ${Math.round((prof.effort-1)*100)}% 上乗せ`
-        : `軽めの作業と判断し ${Math.round((1-prof.effort)*100)}% 割引`);
-    }
-
-    // 2) MAIN DRIVER: how overdue it is against its own rhythm. A daily task is
-    //    late after 1 day; a weekly one only after 7. The longer it is left,
-    //    the more it pays — which is what makes forgotten chores get noticed.
-    const gap = daysSinceLast(habit, asOf);
-    if(gap == null){
-      mult *= 1.3;
-      reasons.push('まだ一度も実施されていないため 30% 上乗せ');
-    } else if(gap > prof.cadence){
-      const overdue = gap / prof.cadence;                 // 2.0 = twice as late
-      const bump = Math.min(1.0, (overdue - 1) * 0.5);    // caps at +100%
-      mult *= (1 + bump);
-      reasons.push(`本来${prof.cadence}日に1回のところ${gap}日空いており ${Math.round(bump*100)}% 値上がり`);
+    const reasons = [];
+    if(mode === 'bonus'){
+      const streak = currentStreak(habit, asOf, personName);
+      if(streak >= 7){ mult = 1.2; reasons.push(`${streak}日連続で継続できているため 20% ボーナス`); }
+      else if(streak >= 3){ mult = 1.1; reasons.push(`${streak}日連続で継続できているため 10% ボーナス`); }
+      else if(streak > 0){ reasons.push(`${streak}日連続中(3日連続でボーナス開始)`); }
+      else { reasons.push(personName ? '連続記録なし。基本金額のままです' : '名前が未設定のため連続記録は計算できません'); }
     } else {
-      const fresh = (1 - gap / prof.cadence) * 0.15;
-      mult *= (1 - fresh);
-      reasons.push(`${gap === 0 ? '今日' : gap + '日前'}に実施済みで、ペースを保てています`);
-    }
-
-    // 3) Who is carrying it, judged over a window sized to its own rhythm.
-    const window = Math.max(WINDOW_DAYS, Math.min(LONG_WINDOW, prof.cadence * 4));
-    const since = new Date(asOf); since.setDate(since.getDate() - window + 1);
-    const recent = events.filter(e => e.type==='habit' && e.itemId===habit.id && e.date >= localDate(since) && e.date <= asOf);
-    const doers = {};
-    recent.forEach(e => { doers[e.name] = (doers[e.name]||0) + 1; });
-    const people = Object.keys(doers).length;
-    if(recent.length >= 2){
-      if(people === 1){
-        mult *= 1.25;
-        reasons.push(`${Object.keys(doers)[0]}さん一人に偏っているため 25% 値上がり`);
-      } else if(people >= 3){
-        mult *= 0.85;
-        reasons.push(`${people}人で分担できているため 15% 値下がり`);
+      const gap = daysSinceLast(habit, asOf);
+      if(gap == null){
+        mult = 1.3;
+        reasons.push('まだ一度も実施されていないため 30% 上乗せ');
+      } else if(gap > prof.cadence){
+        const overdue = gap / prof.cadence;
+        const bump = Math.min(1.0, (overdue - 1) * 0.5);
+        mult = 1 + bump;
+        reasons.push(`本来${prof.cadence}日に1回のところ${gap}日空いており ${Math.round(bump*100)}% 値上がり`);
       } else {
-        mult *= 0.92;
-        reasons.push('2人で分担できているため 8% 値下がり');
+        const fresh = (1 - gap / prof.cadence) * 0.15;
+        mult = 1 - fresh;
+        reasons.push(`${gap === 0 ? '今日' : gap + '日前'}に実施済みで、ペースを保てています`);
       }
     }
+    mult = Math.max(0.5, Math.min(2.5, mult));
+    return { mult, reasons, mode, profile: prof };
+  }
 
-    // 4) AI feedback adjustment, if the family has weighed in on this habit.
-    if(habit.aiAdjust && habit.aiAdjust !== 1){
-      mult *= habit.aiAdjust;
-      reasons.push(`家族からの意見を受けたAIの判断で ${habit.aiAdjust > 1 ? '上乗せ' : '割引'}(${habit.aiAdjust.toFixed(2)}倍)`);
+  // Full pricing. `asOf` defaults to today, `personName` defaults to the
+  // viewer (only matters for bonus mode). priceHistory() passes past dates
+  // to reconstruct what the price would have looked like then.
+  //
+  // Surge mode (household-wide, and depends on whether someone ALREADY did
+  // it today) prefers the value locked in `dailyPricing` — see
+  // ensureDailyPricingLocked — so it can't drift depending on what order
+  // people press buttons in.
+  //
+  // Bonus mode never needs that lock: a personal streak deliberately never
+  // looks at today's own events (see currentStreak above), so computing it
+  // live at any point in the day always gives the same answer — there's
+  // nothing for press order to disturb.
+  function computeHabitPrice(habit, asOf, personName){
+    asOf = asOf || todayStr();
+    personName = personName || myName;
+    const base = habit.basePrice || 0;
+    const mode = habitMode(habit);
+    const prof = habitProfile(habit);
+
+    if(habit.createdAt && (new Date(asOf) - habit.createdAt) < 24*3600*1000){
+      return { price: base, mult: 1, mode, profile: prof, reasons: ['追加から24時間は基本金額のままです(値動きなし)'] };
     }
 
-    mult = Math.max(0.5, Math.min(2.5, mult));
-    return { price: Math.max(1, Math.round(base * mult)), mult, profile: prof, reasons };
+    if(mode !== 'bonus' && asOf === todayStr() && dailyPricing && dailyPricing[habit.id] != null){
+      const locked = dailyPricing[habit.id];
+      return { price: Math.max(1, Math.round(base * locked.m)), mult: locked.m, mode, profile: prof, reasons: [locked.r] };
+    }
+
+    const { mult, reasons } = computeDailyMultiplier(habit, asOf, personName);
+    return { price: Math.max(1, Math.round(base * mult)), mult, mode, profile: prof, reasons };
   }
+
+  // One-time cleanup: the old pricing model stored aiAdjust (a multiplier)
+  // and aiFeedback (its history, in the old shape) on each habit. Both are
+  // retired now that "AIに伝える" proposes basePrice/name/category changes
+  // instead. Gated by catalog.pricingV2 so it runs exactly once per group —
+  // otherwise it would also wipe out legitimate NEW feedback entries, which
+  // reuse the same `aiFeedback` field name in a different shape.
+  async function cleanupLegacyPricingFields(gid){
+    if(!db || gid !== currentGid || catalog.pricingV2) return;
+    catalog.habits.forEach(h=>{ delete h.aiAdjust; delete h.aiFeedback; });
+    catalog.pricingV2 = true;
+    try{
+      await saveHabits();
+      await gRef(gid).child('catalog/pricingV2').set(true);
+    }catch(e){ console.error('legacy field cleanup failed', e); }
+  }
+
+  // Runs once per group per day (first device to notice wins, via a
+  // per-habit transaction so late-arriving/new habits still get locked
+  // individually without touching anyone else's already-locked price).
+  // Only surge-mode habits need this — bonus mode is race-proof by
+  // construction (see computeHabitPrice above) and is never written here.
+  async function ensureDailyPricingLocked(gid){
+    if(!db || gid !== currentGid || !catalog.habits.length) return;
+    const today = todayStr();
+    for(const h of catalog.habits){
+      if(habitMode(h) !== 'surge') continue;
+      if(dailyPricing && dailyPricing[h.id] != null) continue;
+      const { mult, reasons } = computeDailyMultiplier(h, today);
+      try{
+        await gRef(gid).child(`dailyPricing/${today}/${h.id}`).transaction(cur => (cur == null ? { m: mult, r: reasons[0] || '' } : undefined));
+      }catch(e){ console.error('daily pricing lock failed', h.id, e); }
+    }
+  }
+
 
   // Rebuilds what the price WOULD have been on a past date, so we can chart it.
   function priceHistory(habit, days){
@@ -1460,7 +1484,14 @@
       <div class="field"><label>時間(分・任意)</label><input type="number" id="m-min" value="${isEdit&&existing.minutes!=null?existing.minutes:''}" placeholder="10"></div>
       <div class="field"><label>1日に達成できる回数</label><input type="number" id="m-daily" min="1" max="50" value="${isEdit&&existing.dailyLimit?existing.dailyLimit:1}" placeholder="1"></div>
       <div class="field"><label>本来の実施ペース(何日に1回・任意)</label><input type="number" id="m-cadence" min="1" max="60" value="${isEdit&&existing.cadenceDays?existing.cadenceDays:''}" placeholder="毎日なら1、週1なら7(空欄なら自動判定)"></div>
-      <div class="field"><label>基本金額(相場の基準額。実際の金額は需要と供給で変動します)</label><input type="number" id="m-reward" value="${isEdit?existing.basePrice:''}" placeholder="100"></div>
+      <div class="field"><label>値動きモード</label>
+        <select id="m-mode">
+          <option value="" ${isEdit&&!existing.mode?'selected':''}>自動(カテゴリに合わせる: ${defaultModeForCategory(isEdit?existing.category:'chore')==='bonus'?'連続ボーナス':'値上げ'})</option>
+          <option value="surge" ${isEdit&&existing.mode==='surge'?'selected':''}>値上げモード(遅れるほど高くなる)</option>
+          <option value="bonus" ${isEdit&&existing.mode==='bonus'?'selected':''}>連続ボーナスモード(続けるほど高くなる)</option>
+        </select>
+      </div>
+      <div class="field"><label>基本金額(相場の基準額。実際の金額はここに値動きモードの倍率が掛かります)</label><input type="number" id="m-reward" value="${isEdit?existing.basePrice:''}" placeholder="100"></div>
       ${isEdit ? '<div id="m-undo-bar"></div><div id="m-price-info"></div>' : ''}
       ${isEdit && AI_ENABLED ? `
       <div class="field" style="border-top:1px dashed var(--line); padding-top:14px; margin-top:4px;">
@@ -1487,14 +1518,16 @@
       const dailyLimit = Math.max(1, Math.min(50, parseInt(document.getElementById('m-daily').value) || 1));
       const cadRaw = document.getElementById('m-cadence').value;
       const cadenceDays = cadRaw === '' ? null : Math.max(1, Math.min(60, parseInt(cadRaw)));
+      const modeRaw = document.getElementById('m-mode').value;
+      const mode = modeRaw === '' ? null : modeRaw;
       if(!name || basePrice<=0){ showToast('名前と基本金額を入力してください'); return; }
       const minutes = minRaw === '' ? null : parseFloat(minRaw);
       if(isEdit){
         const t = catalog.habits.find(h=>h.id===existing.id);
-        if(t){ t.name=name; t.category=category; t.minutes=minutes; t.basePrice=basePrice; t.dailyLimit=dailyLimit; t.cadenceDays=cadenceDays; }
+        if(t){ t.name=name; t.category=category; t.minutes=minutes; t.basePrice=basePrice; t.dailyLimit=dailyLimit; t.cadenceDays=cadenceDays; t.mode=mode; }
       } else {
         const maxOrder = catalog.habits.reduce((m,h)=>Math.max(m,h.order||0), 0);
-        catalog.habits.push({ id: uid(), name, category, minutes, basePrice, dailyLimit, cadenceDays, createdAt: Date.now(), order: maxOrder + 1 });
+        catalog.habits.push({ id: uid(), name, category, minutes, basePrice, dailyLimit, cadenceDays, mode, createdAt: Date.now(), order: maxOrder + 1 });
       }
       await saveHabits(); renderHabits(); closeModal();
     });
@@ -1526,17 +1559,20 @@
     box.innerHTML = list.map((f,i) => {
       const catLabel = f.suggestedCategory ? (getCategories().find(c=>c.key===f.suggestedCategory)||{}).label : null;
       const actions = [];
+      if(f.suggestedBasePrice != null) actions.push(`<button class="gp-edit" data-apply-price="${i}">基本金額を¥${yen(f.suggestedBasePrice)}に変更</button>`);
       if(f.suggestedName) actions.push(`<button class="gp-edit" data-apply-name="${i}">「${escapeHtml(f.suggestedName)}」に変更</button>`);
       if(f.suggestedCategory) actions.push(`<button class="gp-edit" data-apply-cat="${i}">「${escapeHtml(catLabel||f.suggestedCategory)}」に変更</button>`);
       return `
       <div style="border-top:1px dashed var(--line); padding-top:8px; margin-top:8px; font-size:12px;">
         <div style="color:var(--ink);"><b>${escapeHtml(f.name)}</b>: ${escapeHtml(f.text)}</div>
         ${f.aiReply ? `<div style="color:var(--sage); margin-top:4px;">AI: ${escapeHtml(f.aiReply)}</div>` : ''}
-        ${f.appliedPrice != null ? `<div style="color:var(--ink-soft); margin-top:2px;">→ この時点でAI調整後¥${yen(f.appliedPrice)}(${f.appliedAdjust.toFixed(2)}倍)に設定</div>` : ''}
         ${actions.length ? `<div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">${actions.join('')}</div>` : ''}
       </div>`;
     }).join('');
     const list5 = list; // closures below reference this
+    box.querySelectorAll('[data-apply-price]').forEach(btn=>{
+      btn.addEventListener('click', ()=> applyAiSuggestion(habit.id, 'basePrice', list5[parseInt(btn.dataset.applyPrice)].suggestedBasePrice));
+    });
     box.querySelectorAll('[data-apply-name]').forEach(btn=>{
       btn.addEventListener('click', ()=> applyAiSuggestion(habit.id, 'name', list5[parseInt(btn.dataset.applyName)].suggestedName));
     });
@@ -1556,17 +1592,34 @@
     lines.push('■ 習慣');
     const catLabel = key => (getCategories().find(c=>c.key===key)||{}).label || key || '未分類';
     sortByOrder(catalog.habits).forEach(h=>{
-      const { price, mult, reasons } = computeHabitPrice(h);
-      lines.push(`- ${h.name} [${catLabel(h.category)}]  基本¥${yen(h.basePrice)} → 現在¥${yen(price)}(${mult.toFixed(2)}倍)`);
+      const mode = habitMode(h);
+      lines.push(`- ${h.name} [${catLabel(h.category)}／${mode==='bonus'?'ボーナス(個人ごと)':'値上げ'}モード]  基本¥${yen(h.basePrice)}`);
       if(h.minutes != null) lines.push(`  所要時間: ${h.minutes}分`);
       if(h.cadenceDays) lines.push(`  実施間隔(手動設定): ${h.cadenceDays}日に1回`);
-      reasons.forEach(r => lines.push(`  ・${r}`));
+      if(mode === 'bonus'){
+        // Personal per-habit — show every person who has ever logged it,
+        // plus the exporter if they haven't yet, each with their own streak.
+        const names = [...new Set(events.filter(e=>e.type==='habit'&&e.itemId===h.id).map(e=>e.name))];
+        if(myName && !names.includes(myName)) names.push(myName);
+        if(!names.length){
+          lines.push('  ・まだ誰も実施していません(連続記録なし)');
+        } else {
+          names.forEach(n=>{
+            const { price, mult, reasons } = computeHabitPrice(h, null, n);
+            lines.push(`  ・${n}: 今日¥${yen(price)}(${mult.toFixed(2)}倍) ${reasons[0]||''}`);
+          });
+        }
+      } else {
+        const { price, mult, reasons } = computeHabitPrice(h);
+        lines.push(`  今日¥${yen(price)}(${mult.toFixed(2)}倍)`);
+        reasons.forEach(r => lines.push(`  ・${r}`));
+      }
       if(h.aiFeedback && h.aiFeedback.length){
         lines.push('  意見・AIとのやり取り:');
         h.aiFeedback.forEach(f=>{
           lines.push(`    [${new Date(f.ts).toLocaleDateString('ja-JP')} ${f.name}] ${f.text}`);
           if(f.aiReply) lines.push(`      → AI: ${f.aiReply}`);
-          if(f.appliedPrice != null) lines.push(`      (この時点でAI調整後¥${yen(f.appliedPrice)}, ${f.appliedAdjust.toFixed(2)}倍に設定)`);
+          if(f.suggestedBasePrice != null) lines.push(`      (AI提案: 基本金額を¥${yen(f.suggestedBasePrice)}に)`);
         });
       }
       lines.push('');
@@ -1610,23 +1663,26 @@
     const btn = document.getElementById('m-ai-send');
     btn.disabled = true; btn.textContent = '考え中…';
 
-    // Price BEFORE any AI adjustment — the automatic factors only (pace,
-    // effort, sharing). The AI's new "調整" replaces any previous one, so it
-    // needs to reason against this baseline, not against a number that
-    // already has an old adjustment baked into it.
-    const { price: preAdjustPrice, mult: preAdjustMult } = computeHabitPrice(Object.assign({}, habit, { aiAdjust: 1 }));
-    const prevAdjust = habit.aiAdjust && habit.aiAdjust !== 1 ? habit.aiAdjust : null;
+    // Pricing no longer has a live "adjust" knob — the AI's job here is only
+    // to propose a NEW basePrice (like it already does for name/category),
+    // shown as a suggestion the family applies with a button, never
+    // auto-applied and never expressed as a multiplier.
+    const { price, mult, mode } = computeHabitPrice(habit);
     const catList = getCategories().map(c=>`${c.key}(${c.label})`).join('、');
-    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n自動計算後(AI調整前)の金額: ¥${preAdjustPrice}(基準の${preAdjustMult.toFixed(2)}倍)\n${prevAdjust ? `前回のAI調整: ${prevAdjust.toFixed(2)}倍(今回の回答で上書きされます)` : '前回のAI調整: なし'}\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」または「1.00」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n調整: X.XX (金額に関する意見の時だけ0.7〜1.3の範囲で。「自動計算後(AI調整前)の金額」に掛ける倍率として答えること。前回の調整は上書きされるので、前回の値に重ねて計算しないこと)\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${getCategories().map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信。具体的な金額(円の数字)は書かないこと。実際に反映される金額はシステム側が計算して別途表示するため、返信では方向性と理由だけを述べること\n\nカテゴリの選択肢: ${catList}`;
+    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n現在の基本金額: ¥${habit.basePrice}\n(参考)今日の金額: ¥${price}(基準の${mult.toFixed(2)}倍、モード: ${mode==='bonus'?'連続ボーナス':'値上げ'})\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n提案基本金額: 金額についての意見で変更が妥当なら、新しい基本金額を円の数字だけで(例: 120)。それ以外は「なし」\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${getCategories().map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信。金額を提案する場合でも、返信文自体には具体的な金額の数字を書かないこと(数字は「提案基本金額」の欄にだけ書くこと)\n\nカテゴリの選択肢: ${catList}`;
     const system = 'あなたは家族の家事・習慣共有アプリのアシスタントです。家族からの意見(金額・名前・カテゴリなど)を読み取り、妥当な提案をします。指定された出力形式を厳密に守ってください。返信文には具体的な金額の数字を書かないでください。';
     const reply = await callAI(system, prompt, 250);
 
-    let aiAdjust = habit.aiAdjust || 1;
-    let suggestedName = null, suggestedCategory = null;
+    let suggestedBasePrice = null, suggestedName = null, suggestedCategory = null;
     let replyText = '確認しました。';
     if(reply){
-      const mAdj = reply.match(/調整\s*[:：]\s*([0-9]*\.?[0-9]+)/);
-      if(mAdj) aiAdjust = Math.max(0.7, Math.min(1.3, parseFloat(mAdj[1])));
+      const mPrice = reply.match(/提案基本金額\s*[:：]\s*([0-9,]+)/);
+      if(mPrice){
+        const v = parseInt(mPrice[1].replace(/,/g,''), 10);
+        // Sanity clamp — never trust an unbounded AI number outright, keep
+        // it within a plausible range of the current base.
+        if(v > 0) suggestedBasePrice = Math.max(1, Math.min(habit.basePrice * 3, v));
+      }
 
       const mName = reply.match(/提案名\s*[:：]\s*(.+)/);
       if(mName && !/^なし/.test(mName[1].trim())) suggestedName = mName[1].trim();
@@ -1637,24 +1693,17 @@
       const mReply = reply.match(/返信\s*[:：]\s*([\s\S]+)/);
       replyText = (mReply ? mReply[1] : reply).trim() || replyText;
       // Safety net: strip any yen figures that slipped through anyway, so the
-      // text shown can never contradict the number the app actually applies.
+      // reply text can never contradict the suggested-price button's number.
       replyText = replyText.replace(/¥\s?[\d,]+/g, '').replace(/[\d,]+\s?円/g, '').replace(/\s{2,}/g, ' ').trim() || '確認しました。';
     } else {
       replyText = 'AIに接続できませんでした。少し時間を置いて試してください。';
     }
 
-    // The number that will actually be in effect right after this save —
-    // computed by the app, not quoted by the AI, so it can never drift from
-    // what's really applied.
-    const appliedPrice = Math.max(1, Math.round(preAdjustPrice * aiAdjust));
-
     const target = catalog.habits.find(h=>h.id===habit.id);
     if(target){
-      target.aiAdjust = aiAdjust;
       target.aiFeedback = (target.aiFeedback || []).concat([{
         name: myName, text, ts: Date.now(), aiReply: replyText,
-        suggestedName, suggestedCategory,
-        appliedPrice, appliedAdjust: aiAdjust
+        suggestedBasePrice, suggestedName, suggestedCategory
       }]).slice(-10);
       await saveHabits();
     }
@@ -1670,7 +1719,11 @@
     if(!target) return;
     // Single-level undo: remember what this field was right before overwriting it.
     target.undo = { field, previousValue: target[field] != null ? target[field] : null, ts: Date.now() };
-    if(field === 'name'){
+    if(field === 'basePrice'){
+      target.basePrice = value;
+      const priceInput = document.getElementById('m-reward');
+      if(priceInput) priceInput.value = value;
+    } else if(field === 'name'){
       target.name = value;
       const nameInput = document.getElementById('m-name');
       if(nameInput) nameInput.value = value;
@@ -1682,6 +1735,7 @@
     await saveHabits();
     renderHabits();
     renderUndoBar(target);
+    if(field === 'basePrice') renderPriceInfo(target);
     showToast('AIの提案を適用しました(元に戻すこともできます)');
   }
 
@@ -1689,12 +1743,13 @@
     const box = document.getElementById('m-undo-bar');
     if(!box) return;
     if(!habit.undo){ box.innerHTML = ''; return; }
-    const fieldLabel = habit.undo.field === 'name' ? '名前' : 'カテゴリ';
+    const fieldLabel = habit.undo.field === 'name' ? '名前' : habit.undo.field === 'basePrice' ? '基本金額' : 'カテゴリ';
     let prevLabel = habit.undo.previousValue;
     if(habit.undo.field === 'category'){
       const c = getCategories().find(c=>c.key===habit.undo.previousValue);
       prevLabel = c ? c.label : habit.undo.previousValue;
     }
+    if(habit.undo.field === 'basePrice') prevLabel = '¥' + yen(habit.undo.previousValue);
     box.innerHTML = `
       <div style="background: rgba(139,74,68,.08); border:1px solid var(--brick); border-radius:3px; padding:10px 12px; margin-bottom:14px; font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <span>${fieldLabel}を変更しました</span>
@@ -1710,9 +1765,11 @@
       delete live.undo;
       if(field === 'name'){ const el = document.getElementById('m-name'); if(el) el.value = live.name || ''; }
       if(field === 'category'){ const el = document.getElementById('m-cat'); if(el) el.value = live.category || 'other'; }
+      if(field === 'basePrice'){ const el = document.getElementById('m-reward'); if(el) el.value = live.basePrice || ''; }
       await saveHabits();
       renderHabits();
       renderUndoBar(live);
+      if(field === 'basePrice') renderPriceInfo(live);
       showToast('元に戻しました');
     });
   }
@@ -1721,7 +1778,7 @@
   function renderPriceInfo(habit){
     const box = document.getElementById('m-price-info');
     if(!box) return;
-    const { price, mult, profile, reasons } = computeHabitPrice(habit);
+    const { price, mult, mode, profile, reasons } = computeHabitPrice(habit);
     const hist = priceHistory(habit, 30);
     const vals = hist.map(h=>h.price);
     const min = Math.min(...vals), max = Math.max(...vals);
@@ -1737,7 +1794,7 @@
     box.innerHTML = `
       <div style="border-top:1px dashed var(--line); margin-top:6px; padding-top:14px;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
-          <span style="font-size:12px; color:var(--ink-soft)">いまの金額</span>
+          <span style="font-size:12px; color:var(--ink-soft)">きょうの金額(今日はもう固定・全員同じ)</span>
           <span class="price-tag" style="font-size:22px">¥${yen(price)}</span>
         </div>
         <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="background:var(--paper-alt); border-radius:3px;">
@@ -1747,8 +1804,9 @@
           <span>30日前 ¥${yen(vals[0])}</span><span>最安 ¥${yen(min)} / 最高 ¥${yen(max)}</span>
         </div>
         <div style="font-size:12px; color:var(--ink-soft); margin-top:12px; line-height:1.7;">
-          <b>この習慣の見立て</b><br>${escapeHtml(profile.source)}<br>
-          想定ペース: ${profile.cadence}日に1回<br><br>
+          <b>この習慣の設定</b><br>
+          モード: ${mode==='bonus'?'連続ボーナス(続けるほど高くなる)':'値上げ(遅れるほど高くなる)'}<br>
+          想定ペース: ${profile.cadence}日に1回(${escapeHtml(profile.source)})<br><br>
           <b>金額の内訳(基本 ¥${yen(habit.basePrice)} × ${mult.toFixed(2)})</b><br>
           ${reasons.map(r=>'・'+escapeHtml(r)).join('<br>')}
         </div>
@@ -1978,9 +2036,9 @@
       const mineToday = myName ? events.filter(e=>e.type==='habit' && e.itemId===h.id && e.name===myName && e.date===today).length : 0;
       const done = mineToday > 0;
       const checkLabel = limit > 1 ? (mineToday > 0 ? `${mineToday}/${limit}` : '') : (done ? '✓' : '');
-      const { price, mult } = computeHabitPrice(h);
+      const { price, mult, mode } = computeHabitPrice(h);
       const trend = mult >= 1.2 ? '<span class="trend-tag up">品薄</span>' : (mult <= 0.85 ? '<span class="trend-tag down">定番</span>' : '');
-      const meta = (h.minutes != null ? `${h.minutes}分 ・ ` : '') + (limit > 1 ? `1日${limit}回まで ・ ` : '');
+      const meta = (h.minutes != null ? `${h.minutes}分 ・ ` : '') + (limit > 1 ? `1日${limit}回まで ・ ` : '') + (mode === 'bonus' ? 'あなたの連続日数 ・ ' : '');
       if(selectMode){
         return `<div class="habit-card">
           <div class="pick-box ${picked.has(h.id)?'on':''}" data-pick-item="${h.id}">${picked.has(h.id)?'✓':''}</div>
