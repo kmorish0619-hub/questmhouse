@@ -469,6 +469,12 @@
       </div>
     </div>
 
+    <div class="card">
+      <h3>一覧をコピー</h3>
+      <div class="setting-note">習慣・ごほうびの名前/カテゴリ/基本金額/現在の金額とその内訳、家族からの意見とAIの返信の履歴をテキストでまとめてコピーします。相場の相談などで外部に貼り付けて使えます。</div>
+      <button class="btn ghost" id="export-copy-btn" style="margin-top:10px;">習慣・ごほうび一覧をコピー</button>
+    </div>
+
     <div class="card" id="ai-info-card">
       <h3>AI機能について</h3>
       <div class="setting-note">
@@ -1538,6 +1544,62 @@
     });
   }
 
+  // Plain-text export of the whole catalog for pasting elsewhere (e.g. to
+  // discuss pricing outside the app). Includes current price + why, plus any
+  // family feedback / AI reply history stored on each habit.
+  function buildExportText(){
+    const gname = groupsMeta[currentGid] ? groupsMeta[currentGid].name : '';
+    const lines = [];
+    lines.push(`【${gname}】習慣・ごほうび一覧`, `(${new Date().toLocaleString('ja-JP')} 時点)`, '');
+
+    lines.push('■ 習慣');
+    const catLabel = key => (getCategories().find(c=>c.key===key)||{}).label || key || '未分類';
+    sortByOrder(catalog.habits).forEach(h=>{
+      const { price, mult, reasons } = computeHabitPrice(h);
+      lines.push(`- ${h.name} [${catLabel(h.category)}]  基本¥${yen(h.basePrice)} → 現在¥${yen(price)}(${mult.toFixed(2)}倍)`);
+      if(h.minutes != null) lines.push(`  所要時間: ${h.minutes}分`);
+      if(h.cadenceDays) lines.push(`  実施間隔(手動設定): ${h.cadenceDays}日に1回`);
+      reasons.forEach(r => lines.push(`  ・${r}`));
+      if(h.aiFeedback && h.aiFeedback.length){
+        lines.push('  意見・AIとのやり取り:');
+        h.aiFeedback.forEach(f=>{
+          lines.push(`    [${new Date(f.ts).toLocaleDateString('ja-JP')} ${f.name}] ${f.text}`);
+          if(f.aiReply) lines.push(`      → AI: ${f.aiReply}`);
+        });
+      }
+      lines.push('');
+    });
+
+    lines.push('■ ごほうび');
+    sortByOrder(catalog.rewards).forEach(r=>{
+      lines.push(`- ${r.name}  ¥${yen(r.cost)}`);
+    });
+
+    return lines.join('\n');
+  }
+
+  async function copyExportText(){
+    const text = buildExportText();
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      showToast('コピーしました');
+    }catch(e){
+      console.error('copy failed', e);
+      showToast('コピーできませんでした');
+    }
+  }
+
   async function sendAiFeedback(habit){
     const ta = document.getElementById('m-ai-feedback');
     const text = ta.value.trim();
@@ -1795,6 +1857,7 @@
   document.getElementById('group-switch-habits').addEventListener('click', openGroupPicker);
   document.getElementById('add-group-btn').addEventListener('click', ()=> openGroupNameModal(null));
   document.getElementById('manage-joincode-btn').addEventListener('click', openJoinCodeManageModal);
+  document.getElementById('export-copy-btn').addEventListener('click', copyExportText);
 
   // ---------- Actions ----------
   function myCountToday(habit){
