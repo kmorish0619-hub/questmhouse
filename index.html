@@ -429,7 +429,8 @@
       <div id="group-list"></div>
       <div id="join-action" style="margin-top:14px;"></div>
       <button class="btn ghost" id="add-group-btn" style="margin-top:10px;">新しいグループを作る</button>
-      <div class="setting-note">グループごとに習慣・ごほうび・残高・相場がすべて独立します。家族単位や目的別(ダイエットだけ等)に分けて使えます。<br><br>グループ名をタップすると表示を切り替えられます。表示するだけでは参加になりません。「参加する」を押して初めてメンバーになります。<br><br>グループの作成は自由にできますが、<b>削除にはメンバー全員の承認が必要</b>です。</div>
+      <button class="btn ghost" id="manage-joincode-btn" style="margin-top:10px; display:none;">入会コードを確認・変更する</button>
+      <div class="setting-note">グループごとに習慣・ごほうび・残高・相場がすべて独立します。家族単位や目的別(ダイエットだけ等)に分けて使えます。<br><br>グループ名の一覧は誰でも見えますが、中身は<b>入会コードを知っている人だけ</b>が見られます。グループ名をタップすると入会コードの入力を求められ、あっていれば中身が表示されます(表示するだけではメンバー登録にはなりません。「参加する」を押して初めてメンバーになります)。<br><br>グループの作成は自由にできますが、<b>削除にはメンバー全員の承認が必要</b>です。</div>
     </div>
 
     <div class="card">
@@ -571,6 +572,7 @@
   const LS_GROUP = 'mq-current-group';
   const LS_FAV_H = 'mq-fav-habits';
   const LS_FAV_R = 'mq-fav-rewards';
+  const LS_UNLOCKED = 'mq-unlocked-groups';
 
   const WINDOW_DAYS = 7;
   const DEFAULT_CATEGORIES = [
@@ -587,6 +589,7 @@
   let myName = '';
   let currentGid = '';
   let groupsMeta = {};                 // { gid: {name, createdAt} }
+  let groupJoinCode = '';              // join code of the currently-open group (only known once unlocked)
   let catalog = emptyCatalog();
   let events = [];
   let members = {};                    // { encodedName: {name, joinedAt} }
@@ -599,6 +602,7 @@
   let picked = new Set();
   let favH = {};                       // { gid: [habitId] }
   let favR = {};
+  let unlockedGids = {};                // { gid: true } — groups this device has entered the join code for
   let groupListeners = [];
   let seedGuard = {};                  // gid -> true, prevents repeat seeding in one session
   let catSeedGuard = {};                // gid -> true, same guard for the category seed
@@ -652,6 +656,7 @@
     try{ currentGid = localStorage.getItem(LS_GROUP) || ''; }catch(e){ currentGid = ''; }
     try{ favH = JSON.parse(localStorage.getItem(LS_FAV_H) || '{}') || {}; }catch(e){ favH = {}; }
     try{ favR = JSON.parse(localStorage.getItem(LS_FAV_R) || '{}') || {}; }catch(e){ favR = {}; }
+    try{ unlockedGids = JSON.parse(localStorage.getItem(LS_UNLOCKED) || '{}') || {}; }catch(e){ unlockedGids = {}; }
   }
   function saveName(){ try{ localStorage.setItem(LS_NAME, myName); }catch(e){} }
   function saveGid(){ try{ localStorage.setItem(LS_GROUP, currentGid); }catch(e){} }
@@ -659,6 +664,20 @@
   function saveFavR(){ try{ localStorage.setItem(LS_FAV_R, JSON.stringify(favR)); }catch(e){} }
   const favHSet = () => new Set(favH[currentGid] || []);
   const favRSet = () => new Set(favR[currentGid] || []);
+
+  // A group's content (habits/rewards/records/members) only loads once this
+  // device has entered that group's join code — this list is the local record
+  // of which groups have been unlocked. Re-entering the same group later
+  // doesn't require the code again; only a brand-new device/browser does.
+  function isUnlockedGroup(gid){ return !!unlockedGids[gid]; }
+  function markUnlocked(gid){ unlockedGids[gid] = true; try{ localStorage.setItem(LS_UNLOCKED, JSON.stringify(unlockedGids)); }catch(e){} }
+  function randomJoinCode(len){
+    len = len || 10;
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid mis-typing
+    let s = '';
+    for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
+    return s;
+  }
 
   // ---------- Firebase paths ----------
   const gRef  = gid => db.ref('groups/'+gid);
@@ -718,8 +737,16 @@
     deleteRequest = null;
     aiComment = null;
     aiCommentAttempted = false;
+    groupJoinCode = '';
     renderAll();
     if(!db || !gid) return;
+
+    const jcRef = gRef(gid).child('joinCode');
+    const jcCb = jcRef.on('value', snap=>{
+      groupJoinCode = snap.val() || '';
+      renderGroupList();
+    }, e=>console.error('joinCode listener', e));
+    groupListeners.push({ref:jcRef, cb:jcCb});
 
     const cRef = gRef(gid).child('catalog');
     const cCb = cRef.on('value', snap=>{
@@ -778,6 +805,74 @@
     catSeedGuard = {};
     attachGroupListeners(gid);
     renderAll();
+  }
+
+  // Entry point for tapping a group name from a list. Groups this device has
+  // never unlocked ask for the join code first — nothing about the group's
+  // content (habits/rewards/records/members) is fetched until the code
+  // matches. Already-unlocked groups switch straight away, same as before.
+  function trySwitchGroup(gid){
+    if(gid === currentGid) return;
+    if(isUnlockedGroup(gid)){ switchGroup(gid); return; }
+    openJoinCodeModal(gid);
+  }
+
+  function openJoinCodeModal(gid){
+    const gname = groupsMeta[gid] ? groupsMeta[gid].name : 'このグループ';
+    openModal(`
+      <h3>「${escapeHtml(gname)}」の入会コード</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">このグループの中身を見るには、入会コードの入力が必要です。コードはグループの作成者に聞いてください。</p>
+      <div class="field"><input type="text" id="jc-input" placeholder="入会コード" autocomplete="off" autocapitalize="characters"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="jc-cancel">キャンセル</button>
+        <button class="btn" id="jc-ok">開く</button>
+      </div>
+    `);
+    document.getElementById('jc-cancel').addEventListener('click', closeModal);
+    const submit = async ()=>{
+      const input = document.getElementById('jc-input').value.trim();
+      if(!input){ showToast('入会コードを入力してください'); return; }
+      if(!db){ showToast('オフラインのため確認できません'); return; }
+      let actual = '';
+      try{
+        const snap = await gRef(gid).child('joinCode').once('value');
+        actual = snap.val() || '';
+      }catch(e){ console.error(e); showToast('確認できませんでした。通信状況をご確認ください'); return; }
+      if(!actual || input.toUpperCase() !== String(actual).toUpperCase()){
+        showToast('入会コードが違います');
+        return;
+      }
+      markUnlocked(gid);
+      closeModal();
+      switchGroup(gid);
+    };
+    document.getElementById('jc-ok').addEventListener('click', submit);
+    document.getElementById('jc-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  }
+
+  function openJoinCodeManageModal(){
+    if(!currentGid || !isUnlockedGroup(currentGid)) return;
+    const code = groupJoinCode || '(未設定)';
+    openModal(`
+      <h3>入会コードの管理</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">このコードを知っている人だけが、このグループの中身を見られます。見せたい相手にだけ伝えてください。変更すると、それ以前にコードを知っていた人でも<b>まだこのグループを開いたことがない端末</b>は新しいコードが必要になります。すでに開いたことがある端末は変更後もそのまま見られます。</p>
+      <div class="field"><input type="text" id="jc-manage-input" value="${escapeHtml(code === '(未設定)' ? '' : code)}" placeholder="入会コード" autocomplete="off" autocapitalize="characters"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="jc-random">ランダムに変更</button>
+        <button class="btn" id="jc-manage-save">保存</button>
+      </div>
+    `);
+    document.getElementById('jc-random').addEventListener('click', ()=>{
+      document.getElementById('jc-manage-input').value = randomJoinCode();
+    });
+    document.getElementById('jc-manage-save').addEventListener('click', async ()=>{
+      const val = document.getElementById('jc-manage-input').value.trim();
+      if(!val){ showToast('入会コードを入力してください'); return; }
+      if(!db || !currentGid) return;
+      await gRef(currentGid).child('joinCode').set(val).catch(e=>console.error(e));
+      showToast('入会コードを変更しました');
+      closeModal();
+    });
   }
 
   // A group is only "joined" once the member explicitly registers, or has a
@@ -1587,12 +1682,14 @@
       <p style="font-size:12px; color:var(--ink-soft); margin:0 0 12px;">名前をタップすると表示が切り替わります。表示するだけでは参加になりません。</p>
       <div id="gp-list">
         ${gids.length === 0 ? '<div class="empty">グループがありません</div>' :
-          gids.map(gid=>`
+          gids.map(gid=>{
+            const unlocked = isUnlockedGroup(gid);
+            return `
             <div class="group-pick">
               <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}</div>
-              ${gid===currentGid?'<span class="gp-cur">表示中</span>':''}
-              <button class="gp-edit" data-rename="${gid}">名前</button>
-            </div>`).join('')}
+              ${gid===currentGid?'<span class="gp-cur">表示中</span>':(unlocked?'':'<span class="gp-cur" style="color:var(--ink-soft)">🔒</span>')}
+              ${unlocked ? `<button class="gp-edit" data-rename="${gid}">名前</button>` : ''}
+            </div>`;}).join('')}
       </div>
       ${currentGid && !joined ? `<div class="modal-actions"><button class="btn" id="gp-join">「${escapeHtml(curName)}」に参加する</button></div>` : ''}
       <div class="modal-actions"><button class="btn ghost" id="gp-add">新しいグループを作る</button></div>
@@ -1600,7 +1697,7 @@
     const jb = document.getElementById('gp-join');
     if(jb) jb.addEventListener('click', async ()=>{ await joinCurrentGroup(); closeModal(); });
     modalBody.querySelectorAll('[data-pick]').forEach(el=>{
-      el.addEventListener('click', async ()=>{ closeModal(); await switchGroup(el.dataset.pick); });
+      el.addEventListener('click', ()=>{ closeModal(); trySwitchGroup(el.dataset.pick); });
     });
     modalBody.querySelectorAll('[data-rename]').forEach(el=>{
       el.addEventListener('click', ()=> openGroupNameModal(el.dataset.rename));
@@ -1630,12 +1727,15 @@
       } else {
         if(!myName){ closeModal(); openNameModal(true); return; }
         const newGid = uid();
+        const code = randomJoinCode();
         await metaRef().child(newGid).set({ name, createdAt: Date.now() }).catch(e=>console.error(e));
+        await gRef(newGid).child('joinCode').set(code).catch(e=>console.error(e));
+        markUnlocked(newGid);
         closeModal();
         await switchGroup(newGid);
         await registerMember();
         renderAll();
-        showToast(`グループ「${name}」を作って参加しました`);
+        showToast(`グループ「${name}」を作って参加しました(入会コード: ${code})`);
       }
       renderAll();
     });
@@ -1644,6 +1744,7 @@
   document.getElementById('group-switch-home').addEventListener('click', openGroupPicker);
   document.getElementById('group-switch-habits').addEventListener('click', openGroupPicker);
   document.getElementById('add-group-btn').addEventListener('click', ()=> openGroupNameModal(null));
+  document.getElementById('manage-joincode-btn').addEventListener('click', openJoinCodeManageModal);
 
   // ---------- Actions ----------
   function myCountToday(habit){
@@ -2191,21 +2292,25 @@
       else {
         el.innerHTML = gids.map(gid=>{
           const isCurrent = gid === currentGid;
+          const unlocked = isUnlockedGroup(gid);
           const status = isCurrent
             ? (isJoinedToCurrentGroup()
                 ? '<span class="gp-cur">参加中</span>'
                 : '<span class="gp-cur" style="color:var(--brick)">未参加</span>')
-            : '';
+            : (unlocked ? '' : '<span class="gp-cur" style="color:var(--ink-soft)">🔒 未解錠</span>');
           return `<div class="group-pick">
             <div class="gp-name" data-pick="${gid}">${escapeHtml(groupsMeta[gid].name)}${isCurrent?' (表示中)':''}</div>
             ${status}
-            <button class="gp-edit" data-rename="${gid}">名前</button>
+            ${unlocked ? `<button class="gp-edit" data-rename="${gid}">名前</button>` : ''}
           </div>`;
         }).join('');
-        el.querySelectorAll('[data-pick]').forEach(x=> x.addEventListener('click', ()=> switchGroup(x.dataset.pick)));
+        el.querySelectorAll('[data-pick]').forEach(x=> x.addEventListener('click', ()=> trySwitchGroup(x.dataset.pick)));
         el.querySelectorAll('[data-rename]').forEach(x=> x.addEventListener('click', ()=> openGroupNameModal(x.dataset.rename)));
       }
     }
+
+    const mjb = document.getElementById('manage-joincode-btn');
+    if(mjb) mjb.style.display = (currentGid && isUnlockedGroup(currentGid)) ? '' : 'none';
 
     // Prominent join / leave control for the group currently on screen.
     const ja = document.getElementById('join-action');
@@ -2304,7 +2409,7 @@
       await metaRef().child(gid).remove();
       delete favH[gid]; delete favR[gid]; saveFavH(); saveFavR();
       currentGid = '';
-      const remaining = Object.keys(groupsMeta).filter(g => g !== gid);
+      const remaining = Object.keys(groupsMeta).filter(g => g !== gid && isUnlockedGroup(g));
       if(remaining.length){ await switchGroup(remaining[0]); }
       else { catalog = emptyCatalog(); events = []; members = {}; saveGid(); renderAll(); }
       showToast(`全員の承認により「${gname}」を削除しました`);
@@ -2451,7 +2556,8 @@
       const updates = {};
       if(legacyCat) updates['catalog'] = legacyCat;
       if(legacyEv) updates['events'] = legacyEv;
-      if(Object.keys(updates).length) await gRef(gid).update(updates);
+      updates['joinCode'] = randomJoinCode();
+      await gRef(gid).update(updates);
     }catch(e){ console.error('legacy copy failed', e); }
     return gid;
   }
@@ -2476,16 +2582,22 @@
         bootDone = true;
         if(!Object.keys(groupsMeta).length){
           const gid = await migrateLegacyIfNeeded();
-          if(gid){ currentGid = gid; saveGid(); attachGroupListeners(gid); await registerMember(); }
+          if(gid){ markUnlocked(gid); currentGid = gid; saveGid(); attachGroupListeners(gid); await registerMember(); }
         } else {
           const gids = Object.keys(groupsMeta);
-          if(!currentGid || !groupsMeta[currentGid]){
-            currentGid = gids.sort((a,b)=>(groupsMeta[a].createdAt||0)-(groupsMeta[b].createdAt||0))[0];
+          // Only auto-open a group this device has already unlocked. A fresh
+          // device/browser with no unlocked groups is left without a current
+          // group, so its content stays hidden until a join code is entered.
+          if(!currentGid || !groupsMeta[currentGid] || !isUnlockedGroup(currentGid)){
+            const unlockedGidList = gids.filter(isUnlockedGroup)
+              .sort((a,b)=>(groupsMeta[a].createdAt||0)-(groupsMeta[b].createdAt||0));
+            currentGid = unlockedGidList[0] || '';
             saveGid();
           }
-          attachGroupListeners(currentGid);
+          if(currentGid) attachGroupListeners(currentGid);
         }
         if(!myName) openNameModal(true);
+        else if(!currentGid) openGroupPicker();
       }
       renderAll();
     }, e=>console.error('groupsMeta listener', e));
