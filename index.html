@@ -594,6 +594,7 @@
   let groupsMeta = {};                 // { gid: {name, createdAt} }
   let groupJoinCode = '';              // join code of the currently-open group (only known once unlocked)
   let dailyPricing = null;             // { [habitId]: {m, r} } — today's locked multipliers for the current group
+  let eventsLoaded = false;            // guards ensureDailyPricingLocked against locking before real event history has arrived
   let catalog = emptyCatalog();
   let events = [];
   let members = {};                    // { encodedName: {name, joinedAt} }
@@ -758,6 +759,7 @@
     aiCommentAttempted = false;
     groupJoinCode = '';
     dailyPricing = null;
+    eventsLoaded = false;
     renderAll();
     if(!db || !gid) return;
 
@@ -804,7 +806,15 @@
     const eRef = gRef(gid).child('events');
     const eCb = eRef.on('value', snap=>{
       events = toArray(snap.val());
+      eventsLoaded = true;
       renderAll();
+      // Catalog/dailyPricing listeners can resolve before this one does —
+      // if either already tried to lock today's price, it would have done so
+      // against an empty `events` array (nothing "ever done" yet), wrongly
+      // locking in the never-done +30% for the whole day. Retry now that the
+      // real history is in; ensureDailyPricingLocked itself no-ops on
+      // habits already locked, so this is harmless once events truly is empty.
+      ensureDailyPricingLocked(gid);
     }, e=>console.error('events listener', e));
     groupListeners.push({ref:eRef, cb:eCb});
 
@@ -1215,7 +1225,7 @@
   // Only surge-mode habits need this — bonus mode is race-proof by
   // construction (see computeHabitPrice above) and is never written here.
   async function ensureDailyPricingLocked(gid){
-    if(!db || gid !== currentGid || !catalog.habits.length) return;
+    if(!db || gid !== currentGid || !catalog.habits.length || !eventsLoaded) return;
     const today = todayStr();
     for(const h of catalog.habits){
       if(habitMode(h) !== 'surge') continue;
