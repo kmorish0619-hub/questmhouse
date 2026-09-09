@@ -745,6 +745,10 @@
     const jcCb = jcRef.on('value', snap=>{
       groupJoinCode = snap.val() || '';
       renderGroupList();
+      // Groups that existed before the join-code feature (or were auto-
+      // grandfathered for a device already using them) may have no code yet
+      // — give them one lazily so there's always something to hand out later.
+      if(!groupJoinCode) maybeSeedJoinCode(gid);
     }, e=>console.error('joinCode listener', e));
     groupListeners.push({ref:jcRef, cb:jcCb});
 
@@ -831,14 +835,25 @@
     document.getElementById('jc-cancel').addEventListener('click', closeModal);
     const submit = async ()=>{
       const input = document.getElementById('jc-input').value.trim();
-      if(!input){ showToast('入会コードを入力してください'); return; }
       if(!db){ showToast('オフラインのため確認できません'); return; }
       let actual = '';
       try{
         const snap = await gRef(gid).child('joinCode').once('value');
         actual = snap.val() || '';
       }catch(e){ console.error(e); showToast('確認できませんでした。通信状況をご確認ください'); return; }
-      if(!actual || input.toUpperCase() !== String(actual).toUpperCase()){
+      if(!actual){
+        // No code has ever been set for this group (created before the
+        // join-code feature existed, or lost its local "unlocked" record
+        // before a code could be generated). Nothing exists to check the
+        // input against, so let this device in — a real code gets generated
+        // automatically right after, protecting the group from then on.
+        markUnlocked(gid);
+        closeModal();
+        switchGroup(gid);
+        return;
+      }
+      if(!input){ showToast('入会コードを入力してください'); return; }
+      if(input.toUpperCase() !== String(actual).toUpperCase()){
         showToast('入会コードが違います');
         return;
       }
@@ -968,6 +983,14 @@
     { name:'お花を買う', cost:500 },
     { name:'半日フリー(家事免除)', cost:2000 }
   ];
+
+  // Groups created before the join-code feature existed have no code at all.
+  // A transaction avoids two devices racing to set two different codes.
+  function maybeSeedJoinCode(gid){
+    if(!db || !gid) return;
+    gRef(gid).child('joinCode').transaction(cur => (cur ? undefined : randomJoinCode()))
+      .catch(e=>console.error('joinCode seed failed', e));
+  }
 
   // Seeds a brand-new group once. Uses a transaction on the `seeded` flag so two
   // phones opening a fresh group at the same moment can't both seed it.
@@ -2573,6 +2596,11 @@
   let bootDone = false;
   async function boot(){
     loadLocal();
+    // Grandfather in a group this device already had open before the
+    // join-code feature existed — established usage shouldn't suddenly get
+    // locked out. Brand-new devices that have never had a group open won't
+    // have a currentGid here, so this doesn't weaken the feature for them.
+    if(currentGid && !isUnlockedGroup(currentGid)) markUnlocked(currentGid);
     renderAll();
     if(!db){ showToast('Firebaseに接続できません'); if(!myName) openNameModal(true); return; }
 
