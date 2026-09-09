@@ -479,7 +479,7 @@
       <h3>AI機能について</h3>
       <div class="setting-note">
         「今日のAIの一言」はホームに1日1回、家族の様子から自動で表示されます(全員が別々に生成しないよう、1日1回だけ呼び出します)。<br><br>
-        習慣の編集画面の「AIへの一言」からは、金額・名前・カテゴリなど気になることを自由に送れます。AIが内容を判断し、金額なら最大±30%反映、名前やカテゴリなら提案として表示され、「変更」ボタンで適用できます。やり取りの履歴は編集画面に残ります。
+        習慣の編集画面の「AIへの一言」からは、金額・名前・カテゴリなど気になることを自由に送れます。AIが内容を判断し、金額なら最大±30%反映、名前やカテゴリなら提案として表示され、「変更」ボタンで適用できます。やり取りの履歴は編集画面に残ります。実際に反映された金額は、AIの返信文とは別に、システム側が計算した数字として表示されます。
       </div>
     </div>
 
@@ -1532,6 +1532,7 @@
       <div style="border-top:1px dashed var(--line); padding-top:8px; margin-top:8px; font-size:12px;">
         <div style="color:var(--ink);"><b>${escapeHtml(f.name)}</b>: ${escapeHtml(f.text)}</div>
         ${f.aiReply ? `<div style="color:var(--sage); margin-top:4px;">AI: ${escapeHtml(f.aiReply)}</div>` : ''}
+        ${f.appliedPrice != null ? `<div style="color:var(--ink-soft); margin-top:2px;">→ この時点でAI調整後¥${yen(f.appliedPrice)}(${f.appliedAdjust.toFixed(2)}倍)に設定</div>` : ''}
         ${actions.length ? `<div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">${actions.join('')}</div>` : ''}
       </div>`;
     }).join('');
@@ -1565,6 +1566,7 @@
         h.aiFeedback.forEach(f=>{
           lines.push(`    [${new Date(f.ts).toLocaleDateString('ja-JP')} ${f.name}] ${f.text}`);
           if(f.aiReply) lines.push(`      → AI: ${f.aiReply}`);
+          if(f.appliedPrice != null) lines.push(`      (この時点でAI調整後¥${yen(f.appliedPrice)}, ${f.appliedAdjust.toFixed(2)}倍に設定)`);
         });
       }
       lines.push('');
@@ -1608,10 +1610,15 @@
     const btn = document.getElementById('m-ai-send');
     btn.disabled = true; btn.textContent = '考え中…';
 
-    const { price, mult } = computeHabitPrice(habit);
+    // Price BEFORE any AI adjustment — the automatic factors only (pace,
+    // effort, sharing). The AI's new "調整" replaces any previous one, so it
+    // needs to reason against this baseline, not against a number that
+    // already has an old adjustment baked into it.
+    const { price: preAdjustPrice, mult: preAdjustMult } = computeHabitPrice(Object.assign({}, habit, { aiAdjust: 1 }));
+    const prevAdjust = habit.aiAdjust && habit.aiAdjust !== 1 ? habit.aiAdjust : null;
     const catList = getCategories().map(c=>`${c.key}(${c.label})`).join('、');
-    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n現在の金額: ¥${price}(基準の${mult.toFixed(2)}倍)\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」または「1.00」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n調整: X.XX (金額に関する意見の時だけ0.7〜1.3の範囲で。それ以外は1.00)\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${getCategories().map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信\n\nカテゴリの選択肢: ${catList}`;
-    const system = 'あなたは家族の家事・習慣共有アプリのアシスタントです。家族からの意見(金額・名前・カテゴリなど)を読み取り、妥当な提案をします。指定された出力形式を厳密に守ってください。';
+    const prompt = `習慣名: 「${habit.name}」\n現在のカテゴリ: ${habit.category||'other'}\n所要時間: ${habit.minutes!=null?habit.minutes+'分':'不明'}\n基本金額: ¥${habit.basePrice}\n自動計算後(AI調整前)の金額: ¥${preAdjustPrice}(基準の${preAdjustMult.toFixed(2)}倍)\n${prevAdjust ? `前回のAI調整: ${prevAdjust.toFixed(2)}倍(今回の回答で上書きされます)` : '前回のAI調整: なし'}\n家族からの意見: 「${text}」\n\nこの意見が「金額」「名前」「カテゴリ」「その他」のどれについてかを判断し、以下の形式で厳密に答えてください。該当しない項目は指定通りの「なし」または「1.00」にしてください。\n\n種類: 金額|名前|カテゴリ|その他 のいずれか1つ\n調整: X.XX (金額に関する意見の時だけ0.7〜1.3の範囲で。「自動計算後(AI調整前)の金額」に掛ける倍率として答えること。前回の調整は上書きされるので、前回の値に重ねて計算しないこと)\n提案名: 名前についての意見で改名が妥当なら新しい名前、それ以外は「なし」\n提案カテゴリ: カテゴリについての意見で変更が妥当なら ${getCategories().map(c=>c.key).join('|')} のいずれか、それ以外は「なし」\n返信: 日本語で2文以内の短い返信。具体的な金額(円の数字)は書かないこと。実際に反映される金額はシステム側が計算して別途表示するため、返信では方向性と理由だけを述べること\n\nカテゴリの選択肢: ${catList}`;
+    const system = 'あなたは家族の家事・習慣共有アプリのアシスタントです。家族からの意見(金額・名前・カテゴリなど)を読み取り、妥当な提案をします。指定された出力形式を厳密に守ってください。返信文には具体的な金額の数字を書かないでください。';
     const reply = await callAI(system, prompt, 250);
 
     let aiAdjust = habit.aiAdjust || 1;
@@ -1629,16 +1636,25 @@
 
       const mReply = reply.match(/返信\s*[:：]\s*([\s\S]+)/);
       replyText = (mReply ? mReply[1] : reply).trim() || replyText;
+      // Safety net: strip any yen figures that slipped through anyway, so the
+      // text shown can never contradict the number the app actually applies.
+      replyText = replyText.replace(/¥\s?[\d,]+/g, '').replace(/[\d,]+\s?円/g, '').replace(/\s{2,}/g, ' ').trim() || '確認しました。';
     } else {
       replyText = 'AIに接続できませんでした。少し時間を置いて試してください。';
     }
+
+    // The number that will actually be in effect right after this save —
+    // computed by the app, not quoted by the AI, so it can never drift from
+    // what's really applied.
+    const appliedPrice = Math.max(1, Math.round(preAdjustPrice * aiAdjust));
 
     const target = catalog.habits.find(h=>h.id===habit.id);
     if(target){
       target.aiAdjust = aiAdjust;
       target.aiFeedback = (target.aiFeedback || []).concat([{
         name: myName, text, ts: Date.now(), aiReply: replyText,
-        suggestedName, suggestedCategory
+        suggestedName, suggestedCategory,
+        appliedPrice, appliedAdjust: aiAdjust
       }]).slice(-10);
       await saveHabits();
     }
